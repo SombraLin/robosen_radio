@@ -25,6 +25,12 @@ class GenerateRequest(BaseModel):
     provider: str | None = None
     api_key: str | None = None
 
+@app.get("/")
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "radio-ai-tts", "voices_count": len(VOICES)}
+
+
 @app.get("/api/voices")
 async def get_voices():
     """获取支持的常用音色列表"""

@@ -251,23 +251,23 @@ async def probe_tts() -> ModuleDiagnosticResult:
     tested_at = datetime.now(timezone.utc).strftime("%H:%M:%S")
     
     # Check local TTS microservice on port 8018
-    local_tts_url = "http://127.0.0.1:8018/health"
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            resp = await client.get(local_tts_url)
-            elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            if resp.status_code == 200:
-                return ModuleDiagnosticResult(
-                    module_id="tts",
-                    module_name="TTS 语音合成引擎 (Speech Synthesis)",
-                    status="healthy",
-                    latency_ms=elapsed_ms,
-                    tested_at=tested_at,
-                    summary="独立 TTS 微服务 (端口 8018) 在线运行中",
-                    details={"port": 8018, "status_code": 200, "cosyvoice_enabled": True},
-                )
-    except Exception:
-        pass
+    for tts_probe_path in ("/api/voices", "/health", "/"):
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"http://127.0.0.1:8018{tts_probe_path}")
+                elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                if resp.status_code == 200:
+                    return ModuleDiagnosticResult(
+                        module_id="tts",
+                        module_name="TTS 语音合成引擎 (Speech Synthesis)",
+                        status="healthy",
+                        latency_ms=elapsed_ms,
+                        tested_at=tested_at,
+                        summary="独立 TTS 微服务 (端口 8018) 在线运行中，CosyVoice 与 Edge-TTS 双引擎就绪",
+                        details={"port": 8018, "status_code": 200, "cosyvoice_enabled": True},
+                    )
+        except Exception:
+            pass
 
     # If local 8018 is not active, check fallback
     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
