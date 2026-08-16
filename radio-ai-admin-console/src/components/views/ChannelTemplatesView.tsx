@@ -1,19 +1,34 @@
 import React, { useState } from 'react';
 import { ChannelTemplate, ChannelTemplateItem, PlaylistItemType, AudioType } from '../../types';
+import { useDollStore } from '../../features/dolls/store';
 
 interface ChannelTemplatesViewProps {
-  templates: ChannelTemplate[];
+  templates?: ChannelTemplate[];
   onAddTemplate?: (template: ChannelTemplate) => void;
   onUpdateTemplate?: (template: ChannelTemplate) => void;
   onDeleteTemplate?: (id: string) => void;
 }
 
 export const ChannelTemplatesView: React.FC<ChannelTemplatesViewProps> = ({
-  templates,
-  onAddTemplate,
-  onUpdateTemplate,
-  onDeleteTemplate
+  templates: propsTemplates,
+  onAddTemplate: propsOnAddTemplate,
+  onUpdateTemplate: propsOnUpdateTemplate,
+  onDeleteTemplate: propsOnDeleteTemplate,
 }) => {
+  const storeTemplates = useDollStore((s) => s.templates);
+  const setStoreTemplates = useDollStore((s) => s.setTemplates);
+
+  const templates = propsTemplates || storeTemplates;
+  const onAddTemplate =
+    propsOnAddTemplate ||
+    ((t: ChannelTemplate) => setStoreTemplates([t, ...templates]));
+  const onUpdateTemplate =
+    propsOnUpdateTemplate ||
+    ((t: ChannelTemplate) =>
+      setStoreTemplates(templates.map((item) => (item.id === t.id ? t : item))));
+  const onDeleteTemplate =
+    propsOnDeleteTemplate ||
+    ((id: string) => setStoreTemplates(templates.filter((item) => item.id !== id)));
   const [editingTemplate, setEditingTemplate] = useState<ChannelTemplate | null>(null);
 
   if (editingTemplate) {

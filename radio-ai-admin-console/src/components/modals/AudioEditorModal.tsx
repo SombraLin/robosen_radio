@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { AudioAssetItem, AudioCategory, AudioType } from '../../types';
 import { playSynthPreset, stopCurrentSynth } from '../../utils/audioSynth';
 import { uploadAudioAssetApi, isRadioAiApiEnabled } from '../../api/newsCenter';
+import { useAudioAssetStore } from '../../features/audio-assets/store';
+import { useAudioAssetActions } from '../../features/audio-assets/hooks';
 
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 interface AudioEditorModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  asset: AudioAssetItem | null;
-  onSaveAsset: (asset: AudioAssetItem) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  asset?: AudioAssetItem | null;
+  onSaveAsset?: (asset: AudioAssetItem) => void;
   onDeleteAsset?: (id: string) => void;
 }
 
@@ -34,12 +36,22 @@ const AUDIO_TYPES: AudioType[] = [
 ];
 
 export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
-  isOpen,
-  onClose,
-  asset,
-  onSaveAsset,
-  onDeleteAsset,
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
+  asset: propsAsset,
+  onSaveAsset: propsOnSaveAsset,
+  onDeleteAsset: propsOnDeleteAsset,
 }) => {
+  const storeIsOpen = useAudioAssetStore((s) => s.isAudioEditorOpen);
+  const storeAsset = useAudioAssetStore((s) => s.selectedAsset);
+  const closeEditor = useAudioAssetStore((s) => s.closeAudioEditor);
+  const { saveAsset, deleteAsset } = useAudioAssetActions();
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : storeIsOpen;
+  const onClose = propsOnClose || closeEditor;
+  const asset = propsAsset !== undefined ? propsAsset : storeAsset;
+  const onSaveAsset = propsOnSaveAsset || saveAsset;
+  const onDeleteAsset = propsOnDeleteAsset || deleteAsset;
   const [activeTab, setActiveTab] = useState<'upload' | 'tts'>('upload');
   const [title, setTitle] = useState('');
   const [channelCategory, setChannelCategory] = useState<AudioCategory>('新闻频道');

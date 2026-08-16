@@ -1,29 +1,78 @@
 import React, { useState } from 'react';
 import { NewsClip, BroadcastChainItem, NewsCategory, NewsStatus } from '../../types';
+import { useNewsStore } from '../../features/news-console/store';
+import { useNewsActions } from '../../features/news-console/hooks';
 
 interface NewsConsoleViewProps {
-  newsClips: NewsClip[];
-  chainItems: BroadcastChainItem[];
-  onAddToChain: (clip: NewsClip) => void;
-  onRemoveFromChain: (id: string) => void;
-  onReorderChain: (startIndex: number, endIndex: number) => void;
-  onOpenPreviewModal: () => void;
-  onOpenNewBroadcast: () => void;
-  searchQuery: string;
+  newsClips?: NewsClip[];
+  chainItems?: BroadcastChainItem[];
+  onAddToChain?: (clip: NewsClip) => void;
+  onRemoveFromChain?: (id: string) => void;
+  onReorderChain?: (startIndex: number, endIndex: number) => void;
+  onOpenPreviewModal?: () => void;
+  onOpenNewBroadcast?: () => void;
+  searchQuery?: string;
   onOpenNews?: (newsId: string) => void;
 }
 
 export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
-  newsClips,
-  chainItems,
-  onAddToChain,
-  onRemoveFromChain,
-  onReorderChain,
-  onOpenPreviewModal,
-  onOpenNewBroadcast,
-  searchQuery,
-  onOpenNews,
+  newsClips: propsNewsClips,
+  chainItems: propsChainItems,
+  onAddToChain: propsOnAddToChain,
+  onRemoveFromChain: propsOnRemoveFromChain,
+  onReorderChain: propsOnReorderChain,
+  onOpenPreviewModal: propsOnOpenPreviewModal,
+  onOpenNewBroadcast: propsOnOpenNewBroadcast,
+  searchQuery = '',
+  onOpenNews: propsOnOpenNews,
 }) => {
+  const storeNewsClips = useNewsStore((s) => s.newsClips);
+  const storeChainItems = useNewsStore((s) => s.chainItems);
+  const setChainItems = useNewsStore((s) => s.setChainItems);
+  const setIsPreviewModalOpen = useNewsStore((s) => s.setIsPreviewModalOpen);
+  const setIsNewBroadcastOpen = useNewsStore((s) => s.setIsNewBroadcastOpen);
+  const { openNewsDetailById } = useNewsActions();
+
+  const newsClips = propsNewsClips || storeNewsClips;
+  const chainItems = propsChainItems || storeChainItems;
+
+  const onAddToChain =
+    propsOnAddToChain ||
+    ((clip: NewsClip) => {
+      const newItem: BroadcastChainItem = {
+        id: `chain-${Date.now()}`,
+        type: 'news',
+        title: clip.title,
+        subtitle: `${clip.role} · ${clip.category}`,
+        durationSeconds: clip.durationSeconds,
+        durationFormatted: clip.durationFormatted,
+        clipId: clip.id,
+      };
+      setChainItems((prev) => [...prev, newItem]);
+    });
+
+  const onRemoveFromChain =
+    propsOnRemoveFromChain ||
+    ((id: string) => {
+      setChainItems((prev) => prev.filter((i) => i.id !== id));
+    });
+
+  const onReorderChain =
+    propsOnReorderChain ||
+    ((startIndex: number, endIndex: number) => {
+      setChainItems((prev) => {
+        const result = Array.from(prev);
+        const [removed] = result.splice(startIndex, 1);
+        result.splice(endIndex, 0, removed);
+        return result;
+      });
+    });
+
+  const onOpenPreviewModal =
+    propsOnOpenPreviewModal || (() => setIsPreviewModalOpen(true));
+  const onOpenNewBroadcast =
+    propsOnOpenNewBroadcast || (() => setIsNewBroadcastOpen(true));
+  const onOpenNews = propsOnOpenNews || openNewsDetailById;
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
   const [selectedStatuses, setSelectedStatuses] = useState<NewsStatus[]>(['已就绪', '草稿', '处理中', '生成中']);
 

@@ -13,14 +13,38 @@ import {
   LLM_MODEL_OPTIONS,
   TTS_PROVIDER_OPTIONS,
 } from '../../data/voiceRegistry';
+import { useNewsStore } from '../../features/news-console/store';
+import { useNewsActions } from '../../features/news-console/hooks';
 
 interface NewsDetailModalProps {
-  newsId: string | null;
-  onClose: () => void;
-  onChanged: () => void;
+  newsId?: string | null;
+  onClose?: () => void;
+  onChanged?: () => void;
 }
 
-export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({ newsId, onClose, onChanged }) => {
+export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
+  newsId: propsNewsId,
+  onClose: propsOnClose,
+  onChanged: propsOnChanged,
+}) => {
+  const storeIsOpen = useNewsStore((s) => s.isNewsDetailOpen);
+  const storeDetail = useNewsStore((s) => s.selectedNewsDetail);
+  const setIsOpen = useNewsStore((s) => s.setIsNewsDetailOpen);
+  const setSelectedDetail = useNewsStore((s) => s.setSelectedNewsDetail);
+  const { loadNews } = useNewsActions();
+
+  const newsId = propsNewsId !== undefined ? propsNewsId : storeDetail?.id || (storeIsOpen ? 'detail' : null);
+  const onClose =
+    propsOnClose ||
+    (() => {
+      setIsOpen(false);
+      setSelectedDetail(null);
+    });
+  const onChanged =
+    propsOnChanged ||
+    (() => {
+      loadNews();
+    });
   const [detail, setDetail] = useState<AdminNewsDetailDto | null>(null);
   const [scriptText, setScriptText] = useState('');
   const [commentaryTexts, setCommentaryTexts] = useState<Record<string, string>>({});

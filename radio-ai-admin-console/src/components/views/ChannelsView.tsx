@@ -1,29 +1,32 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Doll, ChannelCategory, PlaylistItem, PlaylistItemType, ChannelTemplate, Channel } from '../../types';
 import { ChannelTemplatesView } from './ChannelTemplatesView';
 import { AiConfigView } from './AiConfigView';
 import { playSynthPreset, stopCurrentSynth } from '../../utils/audioSynth';
-
+import { useDollStore } from '../../features/dolls/store';
+import { useDollActions } from '../../features/dolls/hooks';
+import { useApiKeyStore } from '../../shared/store/useApiKeyStore';
 
 interface ChannelsViewProps {
-  dolls: Doll[];
-  onToggleLive: (dollId: string, variantId: string) => void;
-  onEditDoll: (doll: Doll) => void;
-  onCreateDoll: () => void;
+  dolls?: Doll[];
+  onToggleLive?: (dollId: string, variantId: string) => void;
+  onEditDoll?: (doll: Doll) => void;
+  onCreateDoll?: () => void;
   onDeleteDoll?: (dollId: string) => void;
   onAddChannel?: (dollId: string) => void;
   onEditChannel?: (doll: Doll, variantId: string) => void;
   onDeleteChannel?: (dollId: string, variantId: string) => void;
 
   // Props for Templates
-  templates: ChannelTemplate[];
-  onAddTemplate: (template: ChannelTemplate) => void;
-  onUpdateTemplate: (template: ChannelTemplate) => void;
-  onDeleteTemplate: (id: string) => void;
+  templates?: ChannelTemplate[];
+  onAddTemplate?: (template: ChannelTemplate) => void;
+  onUpdateTemplate?: (template: ChannelTemplate) => void;
+  onDeleteTemplate?: (id: string) => void;
 
   // Props for AI Config
-  apiKey: string;
-  onSaveApiKey: (key: string) => void;
+  apiKey?: string;
+  onSaveApiKey?: (key: string) => void;
 }
 
 const CATEGORY_OPTIONS: { id: string; label: string; icon: string }[] = [
@@ -73,21 +76,90 @@ function getItemTypeBadge(type: PlaylistItemType) {
 }
 
 export const ChannelsView: React.FC<ChannelsViewProps> = ({
-  dolls,
-  onToggleLive,
-  onEditDoll,
-  onCreateDoll,
-  onDeleteDoll,
-  onAddChannel,
-  onEditChannel,
-  onDeleteChannel,
-  templates,
-  onAddTemplate,
-  onUpdateTemplate,
-  onDeleteTemplate,
-  apiKey,
-  onSaveApiKey,
+  dolls: propsDolls,
+  onToggleLive: propsOnToggleLive,
+  onEditDoll: propsOnEditDoll,
+  onCreateDoll: propsOnCreateDoll,
+  onDeleteDoll: propsOnDeleteDoll,
+  onAddChannel: propsOnAddChannel,
+  onEditChannel: propsOnEditChannel,
+  onDeleteChannel: propsOnDeleteChannel,
+  templates: propsTemplates,
+  onAddTemplate: propsOnAddTemplate,
+  onUpdateTemplate: propsOnUpdateTemplate,
+  onDeleteTemplate: propsOnDeleteTemplate,
+  apiKey: propsApiKey,
+  onSaveApiKey: propsOnSaveApiKey,
 }) => {
+  const navigate = useNavigate();
+  const storeDolls = useDollStore((s) => s.dolls);
+  const setDolls = useDollStore((s) => s.setDolls);
+  const storeTemplates = useDollStore((s) => s.templates);
+  const setTemplates = useDollStore((s) => s.setTemplates);
+  const openDollEditor = useDollStore((s) => s.openDollEditor);
+  const setStudioContext = useDollStore((s) => s.setStudioContext);
+  const { deleteDoll: actionDeleteDoll, deleteChannel: actionDeleteChannel, saveChannel: actionSaveChannel } = useDollActions();
+  const storeApiKey = useApiKeyStore((s) => s.dashscopeApiKey);
+  const setDashscopeApiKey = useApiKeyStore((s) => s.setDashscopeApiKey);
+
+  const dolls = propsDolls || storeDolls;
+  const templates = propsTemplates || storeTemplates;
+  const apiKey = propsApiKey || storeApiKey;
+  const onSaveApiKey = propsOnSaveApiKey || setDashscopeApiKey;
+
+  const onEditDoll = propsOnEditDoll || ((d: Doll) => openDollEditor(d));
+  const onCreateDoll = propsOnCreateDoll || (() => openDollEditor(null));
+  const onDeleteDoll = propsOnDeleteDoll || ((dId: string) => actionDeleteDoll(dId));
+  const onAddChannel =
+    propsOnAddChannel ||
+    ((dId: string) => {
+      const targetDoll = dolls.find((d) => d.id === dId || d.doll_id === dId);
+      if (targetDoll) {
+        setStudioContext(targetDoll, null);
+        navigate(`/channels/studio/${targetDoll.id}`);
+      }
+    });
+  const onEditChannel =
+    propsOnEditChannel ||
+    ((d: Doll, vId: string) => {
+      const ch = d.channels.find((c) => c.id === vId || c.channel_id === vId);
+      setStudioContext(d, ch || null);
+      navigate(`/channels/studio/${d.id}/${vId}`);
+    });
+  const onDeleteChannel =
+    propsOnDeleteChannel || ((dId: string, vId: string) => actionDeleteChannel(dId, vId));
+
+  const onToggleLive =
+    propsOnToggleLive ||
+    ((dollId: string, variantId: string) => {
+      setDolls((prev) =>
+        prev.map((d) => {
+          if (d.id === dollId || d.doll_id === dollId) {
+            const nextChannels = d.channels.map((c) => {
+              if (c.id === variantId || c.channel_id === variantId) {
+                const nextChannel = { ...c, isLive: !c.isLive };
+                actionSaveChannel(dollId, nextChannel);
+                return nextChannel;
+              }
+              return c;
+            });
+            return { ...d, channels: nextChannels };
+          }
+          return d;
+        })
+      );
+    });
+
+  const onAddTemplate =
+    propsOnAddTemplate ||
+    ((t: ChannelTemplate) => setTemplates([t, ...templates]));
+  const onUpdateTemplate =
+    propsOnUpdateTemplate ||
+    ((t: ChannelTemplate) =>
+      setTemplates(templates.map((item) => (item.id === t.id ? t : item))));
+  const onDeleteTemplate =
+    propsOnDeleteTemplate ||
+    ((id: string) => setTemplates(templates.filter((item) => item.id !== id)));
   const [activeTab, setActiveTab] = useState<'overview' | 'templates' | 'ai-config'>('overview');
 
   const [expandedDollIds, setExpandedDollIds] = useState<Record<string, boolean>>({});

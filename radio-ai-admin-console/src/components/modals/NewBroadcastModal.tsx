@@ -7,11 +7,13 @@ import {
   TTS_PROVIDER_OPTIONS,
   VoiceOption,
 } from '../../data/voiceRegistry';
+import { useNewsStore } from '../../features/news-console/store';
+import { useNewsActions } from '../../features/news-console/hooks';
 
 interface NewBroadcastModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCompleted: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onCompleted?: () => void;
 }
 
 const TAGS = [
@@ -27,7 +29,23 @@ const TAGS = [
   ['auto', '汽车'],
 ] as const;
 
-export const NewBroadcastModal: React.FC<NewBroadcastModalProps> = ({ isOpen, onClose, onCompleted }) => {
+export const NewBroadcastModal: React.FC<NewBroadcastModalProps> = ({
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
+  onCompleted: propsOnCompleted,
+}) => {
+  const storeIsOpen = useNewsStore((s) => s.isNewBroadcastOpen);
+  const setIsOpen = useNewsStore((s) => s.setIsNewBroadcastOpen);
+  const { loadNews } = useNewsActions();
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : storeIsOpen;
+  const onClose = propsOnClose || (() => setIsOpen(false));
+  const onCompleted =
+    propsOnCompleted ||
+    (() => {
+      loadNews();
+      setIsOpen(false);
+    });
   const [tag, setTag] = useState('hot');
   const [limit, setLimit] = useState(3);
   const [generateAudio, setGenerateAudio] = useState(true);

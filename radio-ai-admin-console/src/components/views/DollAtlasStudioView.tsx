@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DOLL_REGISTRY, DollConfig, updateDollAvatar, getDollConfig } from '../../data/dollRegistry';
 import { saveDollAvatarApi } from '../../api/newsCenter';
+import { useDollStore } from '../../features/dolls/store';
 import {
   Crop,
   Search,
@@ -53,7 +54,16 @@ const DEFAULT_DOLL_COORDS: Record<string, { r: number; c: number }> = {
   'LUCKY-CHEST': { r: 0, c: 0 },
 };
 
-export const DollAtlasStudioView: React.FC<DollAtlasStudioViewProps> = ({ onAvatarSaved }) => {
+export const DollAtlasStudioView: React.FC<DollAtlasStudioViewProps> = ({ onAvatarSaved: propsOnAvatarSaved }) => {
+  const setDolls = useDollStore((s) => s.setDolls);
+
+  const onAvatarSaved =
+    propsOnAvatarSaved ||
+    ((dollId: string, newAvatarUrl: string) => {
+      setDolls((prev) =>
+        prev.map((d) => (d.id === dollId || d.doll_id === dollId ? { ...d, avatarUrl: newAvatarUrl } : d))
+      );
+    });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 

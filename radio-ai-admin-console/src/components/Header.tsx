@@ -1,22 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ThemeSelector } from './ThemeSelector';
 import { ThemeId } from '../theme';
+import { useThemeStore } from '../shared/store/useThemeStore';
+import { useApiKeyStore } from '../shared/store/useApiKeyStore';
 
 interface HeaderProps {
-  pageTitle: string;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
+  pageTitle?: string;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
   isLiveRunning?: boolean;
-  currentTheme: ThemeId;
-  onThemeChange: (themeId: ThemeId) => void;
+  currentTheme?: ThemeId;
+  onThemeChange?: (themeId: ThemeId) => void;
   onToggleMobileSidebar?: () => void;
   onOpenAtlasStudio?: () => void;
   onOpenApiKeySettings?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  pageTitle,
-  searchQuery,
+  pageTitle = 'RADIO AI 频道总编室',
+  searchQuery = '',
   onSearchChange,
   isLiveRunning = true,
   currentTheme,
@@ -25,8 +28,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAtlasStudio,
   onOpenApiKeySettings,
 }) => {
+  const navigate = useNavigate();
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const settingsRef = useRef<HTMLDivElement | null>(null);
+
+  const setApiKeyModalOpen = useApiKeyStore((s) => s.setSettingsModalOpen);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -37,6 +43,24 @@ export const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleOpenApiKeySettings = () => {
+    setIsSettingsOpen(false);
+    if (onOpenApiKeySettings) {
+      onOpenApiKeySettings();
+    } else {
+      setApiKeyModalOpen(true);
+    }
+  };
+
+  const handleOpenAtlas = () => {
+    setIsSettingsOpen(false);
+    if (onOpenAtlasStudio) {
+      onOpenAtlasStudio();
+    } else {
+      navigate('/atlas');
+    }
+  };
 
   return (
     <header className="bg-[var(--bg-primary)]/90 backdrop-blur-md border-b border-[var(--border-color)] sticky top-0 z-40 flex justify-between items-center px-4 md:px-8 h-20 transition-colors duration-300">
@@ -51,7 +75,9 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="material-symbols-outlined text-xl">menu</span>
           </button>
         )}
-        <h2 className="text-lg md:text-xl font-serif-editorial font-bold text-[var(--text-primary)] tracking-wide">{pageTitle}</h2>
+        <h2 className="text-lg md:text-xl font-serif-editorial font-bold text-[var(--text-primary)] tracking-wide">
+          {pageTitle}
+        </h2>
         <div className="h-5 w-px bg-[var(--border-color)] hidden sm:block"></div>
         <div className="hidden sm:flex items-center gap-2 text-[var(--accent)]">
           <div className={`w-2 h-2 rounded-full ${isLiveRunning ? 'bg-[var(--accent)] live-dot' : 'bg-gray-500'}`}></div>
@@ -63,28 +89,38 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Actions & Global Search */}
       <div className="flex items-center gap-4">
-        <div className="relative w-64 hidden lg:block">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">
-            search
-          </span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="搜索广播特刊、文案或玩偶..."
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm py-1.5 pl-9 pr-4 text-xs font-data-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] placeholder:text-[var(--text-muted)] transition-all"
-          />
-        </div>
+        {onSearchChange && (
+          <div className="relative w-64 hidden lg:block">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">
+              search
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="搜索广播特刊、文案或玩偶..."
+              className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm py-1.5 pl-9 pr-4 text-xs font-data-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] placeholder:text-[var(--text-muted)] transition-all"
+            />
+          </div>
+        )}
 
         <div className="flex items-center gap-1 relative" ref={settingsRef}>
           {/* Theme Selector Dropdown in top right corner */}
           <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
 
-          <button className="p-2 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-subcard)] rounded-full transition-colors relative cursor-pointer" title="通知">
+          <button
+            onClick={() => navigate('/logs')}
+            className="p-2 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-subcard)] rounded-full transition-colors relative cursor-pointer"
+            title="实时日志"
+          >
             <span className="material-symbols-outlined text-[20px]">notifications</span>
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--accent)]"></span>
           </button>
-          <button className="p-2 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-subcard)] rounded-full transition-colors cursor-pointer" title="信号探测">
+          <button
+            onClick={() => navigate('/device')}
+            className="p-2 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-subcard)] rounded-full transition-colors cursor-pointer"
+            title="设备探测"
+          >
             <span className="material-symbols-outlined text-[20px]">sensors</span>
           </button>
 
@@ -108,12 +144,26 @@ export const Header: React.FC<HeaderProps> = ({
                 系统设置与工作台工具
               </div>
 
-              {/* Menu Item: API Key Settings */}
+              {/* Menu Item: AI Config Page */}
               <button
                 onClick={() => {
                   setIsSettingsOpen(false);
-                  if (onOpenApiKeySettings) onOpenApiKeySettings();
+                  navigate('/ai-config');
                 }}
+                className="w-full px-4 py-3 text-left flex items-center gap-3 text-xs font-serif-editorial text-[var(--text-primary)] hover:bg-[var(--bg-subcard)] hover:text-[var(--accent)] border-b border-[var(--border-color)] transition-colors cursor-pointer group"
+              >
+                <span className="material-symbols-outlined text-lg text-[var(--accent)] group-hover:scale-110 transition-transform">
+                  tune
+                </span>
+                <div>
+                  <div className="font-bold">AI 模型与音色设置</div>
+                  <div className="text-[10px] text-[var(--text-muted)] mt-0.5">配置全量玩偶音色、LLM 与提示词</div>
+                </div>
+              </button>
+
+              {/* Menu Item: API Key Settings */}
+              <button
+                onClick={handleOpenApiKeySettings}
                 className="w-full px-4 py-3 text-left flex items-center gap-3 text-xs font-serif-editorial text-[var(--text-primary)] hover:bg-[var(--bg-subcard)] hover:text-[var(--accent)] border-b border-[var(--border-color)] transition-colors cursor-pointer group"
               >
                 <span className="material-symbols-outlined text-lg text-[var(--accent)] group-hover:scale-110 transition-transform">
@@ -127,10 +177,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Menu Item: Atlas Studio */}
               <button
-                onClick={() => {
-                  setIsSettingsOpen(false);
-                  if (onOpenAtlasStudio) onOpenAtlasStudio();
-                }}
+                onClick={handleOpenAtlas}
                 className="w-full px-4 py-3 text-left flex items-center gap-3 text-xs font-serif-editorial text-[var(--text-primary)] hover:bg-[var(--bg-subcard)] hover:text-[var(--accent)] transition-colors cursor-pointer group"
               >
                 <span className="material-symbols-outlined text-lg text-[var(--accent)] group-hover:scale-110 transition-transform">
@@ -159,4 +206,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

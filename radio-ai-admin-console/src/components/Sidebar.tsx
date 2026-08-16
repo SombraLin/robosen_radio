@@ -1,29 +1,41 @@
 import React from 'react';
-import { ViewTab } from '../types';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useNewsStore } from '../features/news-console/store';
 
 interface SidebarProps {
-  currentTab: ViewTab;
-  onSelectTab: (tab: ViewTab) => void;
-  onOpenNewBroadcast: () => void;
+  currentTab?: string;
+  onSelectTab?: (tab: any) => void;
+  onOpenNewBroadcast?: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  currentTab,
-  onSelectTab,
-  onOpenNewBroadcast,
   isOpenMobile = false,
   onCloseMobile,
+  onOpenNewBroadcast,
 }) => {
-  const navItems: { id: ViewTab; label: string; icon: string; filledIcon?: boolean }[] = [
-    { id: 'dashboard', label: '仪表盘', icon: 'dashboard' },
-    { id: 'channels', label: '玩偶频道', icon: 'podcasts' },
-    { id: 'automation', label: '自动化', icon: 'settings_input_component' },
-    { id: 'audio', label: '音频库', icon: 'audio_file' },
-    { id: 'device', label: '设备模拟器', icon: 'developer_board' },
-    { id: 'logs', label: '实时日志', icon: 'terminal' },
-    { id: 'trash', label: '回收站', icon: 'delete' },
+  const location = useLocation();
+  const setIsNewBroadcastOpen = useNewsStore((s) => s.setIsNewBroadcastOpen);
+
+  const handleOpenNewBroadcast = () => {
+    if (onOpenNewBroadcast) {
+      onOpenNewBroadcast();
+    } else {
+      setIsNewBroadcastOpen(true);
+    }
+  };
+
+  const navItems = [
+    { path: '/dashboard', label: '仪表盘', icon: 'dashboard' },
+    { path: '/channels', label: '玩偶频道', icon: 'podcasts' },
+    { path: '/news', label: '新闻控制台', icon: 'newspaper' },
+    { path: '/automation', label: '自动化', icon: 'settings_input_component' },
+    { path: '/audio', label: '音频库', icon: 'audio_file' },
+    { path: '/device', label: '设备模拟器', icon: 'developer_board' },
+    { path: '/ai-config', label: 'AI 与音色配置', icon: 'tune' },
+    { path: '/logs', label: '实时日志', icon: 'terminal' },
+    { path: '/trash', label: '回收站', icon: 'delete' },
   ];
 
   return (
@@ -43,15 +55,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Brand Header */}
         <div className="px-6 mb-8 border-b border-[var(--border-color)] pb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <NavLink to="/channels" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-sm bg-[var(--accent)] flex items-center justify-center text-[var(--accent-text)] font-serif-editorial font-bold text-xl shadow-md">
               境
             </div>
             <div>
-              <h1 className="font-serif-editorial font-bold text-xl text-[var(--text-primary)] tracking-widest uppercase">RADIO AI</h1>
-              <p className="text-[10px] text-[var(--accent)] font-data-mono uppercase tracking-[0.2em] mt-0.5">NO. 088 / 编辑导播套件</p>
+              <h1 className="font-serif-editorial font-bold text-xl text-[var(--text-primary)] tracking-widest uppercase">
+                RADIO AI
+              </h1>
+              <p className="text-[10px] text-[var(--accent)] font-data-mono uppercase tracking-[0.2em] mt-0.5">
+                NO. 088 / 编辑导播套件
+              </p>
             </div>
-          </div>
+          </NavLink>
           {onCloseMobile && (
             <button
               onClick={onCloseMobile}
@@ -65,14 +81,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation Links */}
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
-            const isActive = currentTab === item.id;
+            const isActive =
+              location.pathname === item.path ||
+              (item.path === '/channels' && location.pathname.startsWith('/channels')) ||
+              (item.path === '/audio' && location.pathname.startsWith('/audio'));
+
             return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  if (onCloseMobile) onCloseMobile();
-                }}
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={onCloseMobile}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-all duration-150 text-left cursor-pointer border ${
                   isActive
                     ? 'bg-[var(--bg-subcard)] border-[var(--accent)]/50 text-[var(--accent)] font-bold shadow-sm'
@@ -80,41 +98,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 <span
-                  className={`material-symbols-outlined text-[20px] ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}
+                  className={`material-symbols-outlined text-[20px] ${
+                    isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
+                  }`}
                   style={{ fontVariationSettings: `'FILL' ${isActive ? 1 : 0}` }}
                 >
                   {item.icon}
                 </span>
                 <span className="text-xs font-serif-editorial tracking-wider">{item.label}</span>
-              </button>
+              </NavLink>
             );
           })}
         </nav>
 
-      {/* CTA & Profile */}
-      <div className="px-5 mt-auto pt-4 space-y-4">
-        <button
-          onClick={onOpenNewBroadcast}
-          className="w-full py-3 px-4 bg-[var(--accent)] text-[var(--accent-text)] font-bold text-xs uppercase tracking-[0.15em] rounded-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-base">add</span>
-          <span className="font-serif-editorial">新建播报特刊</span>
-        </button>
+        {/* CTA & Profile */}
+        <div className="px-5 mt-auto pt-4 space-y-4">
+          <button
+            onClick={handleOpenNewBroadcast}
+            className="w-full py-3 px-4 bg-[var(--accent)] text-[var(--accent-text)] font-bold text-xs uppercase tracking-[0.15em] rounded-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">add</span>
+            <span className="font-serif-editorial">新建播报特刊</span>
+          </button>
 
-        <div className="flex items-center gap-3 p-3 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)]">
-          <img
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAB6jl8yMYGKDFKi_PR1JmuSsBDOJ8SiBXhleirP_cIL-FRHG3mkmvnDT2T1o_RilbGmJ7rNpjJJe9FyIRzXv_XtJfukXAV43KbTwmYIkQynL5lBOUp_N-EZiKJMR2xgeH8aMJjDr_IdoKXiLY1t6Xhkp9ZgZC4kmGwENW1kQdK0Qy_STPNh8HuEfy7ZJ-FVFGB1pU64IBiFFTr3ZJQbTlCbaal9xwsTUCtdQRY3t7iICAgeBi0ANrh-w"
-            alt="Admin Profile"
-            className="w-8 h-8 rounded-full object-cover border border-[var(--accent)]/40"
-          />
-          <div className="overflow-hidden">
-            <p className="text-xs font-bold text-[var(--text-primary)] truncate font-serif-editorial">广播导播台</p>
-            <p className="text-[10px] text-[var(--accent)] font-data-mono truncate uppercase tracking-widest">总编室</p>
+          <div className="flex items-center gap-3 p-3 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <img
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAB6jl8yMYGKDFKi_PR1JmuSsBDOJ8SiBXhleirP_cIL-FRHG3mkmvnDT2T1o_RilbGmJ7rNpjJJe9FyIRzXv_XtJfukXAV43KbTwmYIkQynL5lBOUp_N-EZiKJMR2xgeH8aMJjDr_IdoKXiLY1t6Xhkp9ZgZC4kmGwENW1kQdK0Qy_STPNh8HuEfy7ZJ-FVFGB1pU64IBiFFTr3ZJQbTlCbaal9xwsTUCtdQRY3t7iICAgeBi0ANrh-w"
+              alt="Admin Profile"
+              className="w-8 h-8 rounded-full object-cover border border-[var(--accent)]/40"
+            />
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-[var(--text-primary)] truncate font-serif-editorial">
+                广播导播台
+              </p>
+              <p className="text-[10px] text-[var(--accent)] font-data-mono truncate uppercase tracking-widest">
+                总编室
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    </aside>
-  </>
-);
+      </aside>
+    </>
+  );
 };
-

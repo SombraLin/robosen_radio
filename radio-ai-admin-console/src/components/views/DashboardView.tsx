@@ -1,5 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Doll, NewsClip } from '../../types';
+import { useNewsStore } from '../../features/news-console/store';
+import { useDollStore } from '../../features/dolls/store';
+import { useDollActions } from '../../features/dolls/hooks';
 
 interface DashboardViewProps {
   newsClips?: NewsClip[];
@@ -11,13 +15,45 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
-  newsClips = [],
-  dolls = [],
-  onNavigateToNews,
-  onNavigateToChannels,
+  newsClips: propsNewsClips,
+  dolls: propsDolls,
+  onNavigateToNews: propsOnNavigateToNews,
+  onNavigateToChannels: propsOnNavigateToChannels,
   onPlayClip,
-  onToggleLive,
+  onToggleLive: propsOnToggleLive,
 }) => {
+  const navigate = useNavigate();
+  const storeNewsClips = useNewsStore((s) => s.newsClips);
+  const storeDolls = useDollStore((s) => s.dolls);
+  const setDolls = useDollStore((s) => s.setDolls);
+  const { saveChannel } = useDollActions();
+
+  const newsClips = propsNewsClips || storeNewsClips;
+  const dolls = propsDolls || storeDolls;
+
+  const onNavigateToNews = propsOnNavigateToNews || (() => navigate('/news'));
+  const onNavigateToChannels = propsOnNavigateToChannels || (() => navigate('/channels'));
+
+  const onToggleLive =
+    propsOnToggleLive ||
+    ((dollId: string, channelId: string) => {
+      setDolls((prev) =>
+        prev.map((d) => {
+          if (d.id === dollId || d.doll_id === dollId) {
+            const nextChannels = d.channels.map((c) => {
+              if (c.id === channelId || c.channel_id === channelId) {
+                const nextChannel = { ...c, isLive: !c.isLive };
+                saveChannel(dollId, nextChannel);
+                return nextChannel;
+              }
+              return c;
+            });
+            return { ...d, channels: nextChannels };
+          }
+          return d;
+        })
+      );
+    });
   return (
     <div className="p-8 max-w-[1440px] mx-auto space-y-8 animate-fadeIn transition-colors duration-300">
       {/* Top Page Banner */}

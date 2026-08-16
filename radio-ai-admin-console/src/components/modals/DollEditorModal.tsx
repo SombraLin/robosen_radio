@@ -4,22 +4,34 @@ import { DOLL_REGISTRY, DollConfig, updateDollAvatar } from '../../data/dollRegi
 import { saveDollAvatarApi } from '../../api/newsCenter';
 import { AvatarCropperModal } from './AvatarCropperModal';
 import { Upload, Crop } from 'lucide-react';
+import { useDollStore } from '../../features/dolls/store';
+import { useDollActions } from '../../features/dolls/hooks';
 
 interface DollEditorModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  doll: Doll | null;
-  onSaveDoll: (updatedDoll: Doll) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  doll?: Doll | null;
+  onSaveDoll?: (updatedDoll: Doll) => void;
   onDeleteDoll?: (dollId: string) => void;
 }
 
 export const DollEditorModal: React.FC<DollEditorModalProps> = ({
-  isOpen,
-  onClose,
-  doll,
-  onSaveDoll,
-  onDeleteDoll,
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
+  doll: propsDoll,
+  onSaveDoll: propsOnSaveDoll,
+  onDeleteDoll: propsOnDeleteDoll,
 }) => {
+  const storeIsOpen = useDollStore((s) => s.isDollEditorOpen);
+  const storeEditingDoll = useDollStore((s) => s.editingDoll);
+  const closeDollEditor = useDollStore((s) => s.closeDollEditor);
+  const { saveDoll: actionSaveDoll, deleteDoll: actionDeleteDoll } = useDollActions();
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : storeIsOpen;
+  const onClose = propsOnClose || closeDollEditor;
+  const doll = propsDoll !== undefined ? propsDoll : storeEditingDoll;
+  const onSaveDoll = propsOnSaveDoll || actionSaveDoll;
+  const onDeleteDoll = propsOnDeleteDoll || actionDeleteDoll;
   const [selectedDollIdKey, setSelectedDollIdKey] = useState<string>('MINI-LOTSO');
   const [dollName, setDollName] = useState('草莓熊 Lotso');
   const [stationCode, setStationCode] = useState('STATION_LOTSO');

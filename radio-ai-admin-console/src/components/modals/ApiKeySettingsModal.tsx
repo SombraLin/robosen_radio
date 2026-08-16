@@ -6,13 +6,22 @@ import {
   LLM_MODEL_OPTIONS,
   TTS_PROVIDER_OPTIONS,
 } from '../../data/voiceRegistry';
+import { useApiKeyStore } from '../../shared/store/useApiKeyStore';
 
 interface ApiKeySettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export const ApiKeySettingsModal: React.FC<ApiKeySettingsModalProps> = ({ isOpen, onClose }) => {
+export const ApiKeySettingsModal: React.FC<ApiKeySettingsModalProps> = ({
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
+}) => {
+  const storeIsOpen = useApiKeyStore((s) => s.isSettingsModalOpen);
+  const setStoreIsOpen = useApiKeyStore((s) => s.setSettingsModalOpen);
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : storeIsOpen;
+  const onClose = propsOnClose || (() => setStoreIsOpen(false));
   // DashScope (Bailian Qwen / CosyVoice) API Key
   const [dashscopeApiKey, setDashscopeApiKey] = useState('');
   const [agentAppKey, setAgentAppKey] = useState('');

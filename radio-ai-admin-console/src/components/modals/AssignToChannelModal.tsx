@@ -1,21 +1,42 @@
 import React, { useState } from 'react';
 import { AudioAssetItem, Doll } from '../../types';
+import { useAudioAssetStore } from '../../features/audio-assets/store';
+import { useAudioAssetActions } from '../../features/audio-assets/hooks';
+import { useDollStore } from '../../features/dolls/store';
 
 interface AssignToChannelModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  asset: AudioAssetItem | null;
-  dolls: Doll[];
-  onAssignAssetToChannel: (assetId: string, dollId: string, channelId: string, itemType: 'intro' | 'transition' | 'outro' | 'music_track') => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  asset?: AudioAssetItem | null;
+  dolls?: Doll[];
+  onAssignAssetToChannel?: (assetId: string, dollId: string, channelId: string, itemType: 'intro' | 'transition' | 'outro' | 'music_track') => void;
 }
 
 export const AssignToChannelModal: React.FC<AssignToChannelModalProps> = ({
-  isOpen,
-  onClose,
-  asset,
-  dolls,
-  onAssignAssetToChannel,
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
+  asset: propsAsset,
+  dolls: propsDolls,
+  onAssignAssetToChannel: propsOnAssignAssetToChannel,
 }) => {
+  const storeIsOpen = useAudioAssetStore((s) => s.isAssignModalOpen);
+  const storeAsset = useAudioAssetStore((s) => s.assignTargetAsset);
+  const closeAssignModal = useAudioAssetStore((s) => s.closeAssignModal);
+  const storeDolls = useDollStore((s) => s.dolls);
+  const { assignAssetToChannel } = useAudioAssetActions();
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : storeIsOpen;
+  const onClose = propsOnClose || closeAssignModal;
+  const asset = propsAsset !== undefined ? propsAsset : storeAsset;
+  const dolls = propsDolls || storeDolls;
+  const onAssignAssetToChannel =
+    propsOnAssignAssetToChannel ||
+    ((assetId: string, dollId: string, channelId: string) => {
+      const targetAsset = asset || storeDolls.flatMap(() => []).length ? asset : null;
+      if (targetAsset) {
+        assignAssetToChannel(targetAsset, dollId, channelId);
+      }
+    });
   const [selectedDollId, setSelectedDollId] = useState<string>('');
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
   const [itemType, setItemType] = useState<'intro' | 'transition' | 'outro' | 'music_track'>('intro');

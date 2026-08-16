@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Doll, Channel, ChannelCategory, PlaylistItem, PlaylistItemType, NewsClip, NewsStatus, AudioAssetItem, NewsCategory } from '../../types';
 import { generateDollPersona, generateAiNodeScriptApi } from '../../services/geminiService';
 import { speakTextWithPersona } from '../../utils/audioSynth';
 import { PRESET_DOLL_IDS, INITIAL_NEWS_CLIPS, INITIAL_AUDIO_ASSETS } from '../../data/mockData';
 import { getAdminNews, isRadioAiApiEnabled, getDollsApi, saveDollApi, deleteDollApi, saveChannelApi, deleteChannelApi, getAudioAssetsApi, freezeChannelApi, runNewsPipeline } from '../../api/newsCenter';
+import { useDollStore } from '../../features/dolls/store';
+import { useDollActions } from '../../features/dolls/hooks';
+import { useAudioAssetStore } from '../../features/audio-assets/store';
 
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -471,24 +475,50 @@ const NODE_TYPE_OPTIONS: NodeTypeOption[] = [
 ];
 
 interface ChannelStudioViewProps {
-  doll: Doll;
+  doll?: Doll;
   channelId?: string | null;
-  onBack: () => void;
-  onSaveChannel: (dollId: string, channel: Channel) => void;
+  onBack?: () => void;
+  onSaveChannel?: (dollId: string, channel: Channel) => void;
   onDeleteChannel?: (dollId: string, channelId: string) => void;
   audioAssets?: AudioAssetItem[];
 }
 
 export const ChannelStudioView: React.FC<ChannelStudioViewProps> = ({
-  doll,
-  channelId,
-  onBack,
-  onSaveChannel,
-  onDeleteChannel,
-  audioAssets,
+  doll: propsDoll,
+  channelId: propsChannelId,
+  onBack: propsOnBack,
+  onSaveChannel: propsOnSaveChannel,
+  onDeleteChannel: propsOnDeleteChannel,
+  audioAssets: propsAudioAssets,
 }) => {
+  const navigate = useNavigate();
+  const routeParams = useParams<{ dollId?: string; channelId?: string }>();
+  const storeDolls = useDollStore((s) => s.dolls);
+  const storeStudioDoll = useDollStore((s) => s.studioDoll);
+  const storeStudioChannel = useDollStore((s) => s.studioChannel);
+  const { saveChannel: actionSaveChannel, deleteChannel: actionDeleteChannel } = useDollActions();
+  const storeAudioAssets = useAudioAssetStore((s) => s.audioAssets);
+
+  const doll =
+    propsDoll ||
+    storeStudioDoll ||
+    storeDolls.find((d) => d.id === routeParams.dollId || d.doll_id === routeParams.dollId) ||
+    storeDolls[0];
+
+  const channelId =
+    propsChannelId !== undefined
+      ? propsChannelId
+      : routeParams.channelId || storeStudioChannel?.id || null;
+
+  const onBack = propsOnBack || (() => navigate('/channels'));
+  const onSaveChannel =
+    propsOnSaveChannel || ((dId: string, ch: Channel) => actionSaveChannel(dId, ch));
+  const onDeleteChannel =
+    propsOnDeleteChannel || ((dId: string, cId: string) => actionDeleteChannel(dId, cId));
+  const audioAssets = propsAudioAssets || storeAudioAssets;
+
   const isEditingExisting = Boolean(channelId);
-  const targetChannel = doll.channels.find(
+  const targetChannel = doll?.channels?.find(
     (c) => c.id === channelId || c.channel_id === channelId
   );
 

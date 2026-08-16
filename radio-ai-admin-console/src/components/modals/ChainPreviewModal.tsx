@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { BroadcastChainItem } from '../../types';
+import { useNewsStore } from '../../features/news-console/store';
 
 interface ChainPreviewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  chainItems: BroadcastChainItem[];
+  isOpen?: boolean;
+  onClose?: () => void;
+  chainItems?: BroadcastChainItem[];
 }
 
 export const ChainPreviewModal: React.FC<ChainPreviewModalProps> = ({
-  isOpen,
-  onClose,
-  chainItems,
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
+  chainItems: propsChainItems,
 }) => {
+  const storeIsOpen = useNewsStore((s) => s.isPreviewModalOpen);
+  const setIsOpen = useNewsStore((s) => s.setIsPreviewModalOpen);
+  const storeChainItems = useNewsStore((s) => s.chainItems);
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : storeIsOpen;
+  const onClose = propsOnClose || (() => setIsOpen(false));
+  const chainItems = propsChainItems || storeChainItems;
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progressSec, setProgressSec] = useState(0);

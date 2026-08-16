@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { getGenerativeConfigApi, updateGenerativeConfigApi, GenerativeConfigDto } from '../../api/newsCenter';
 import { LLM_MODEL_OPTIONS, TTS_PROVIDER_OPTIONS, VOICE_OPTIONS } from '../../data/voiceRegistry';
+import { useApiKeyStore } from '../../shared/store/useApiKeyStore';
 
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 interface AiConfigViewProps {
-  apiKey: string;
-  onSaveApiKey: (key: string) => void;
+  apiKey?: string;
+  onSaveApiKey?: (key: string) => void;
 }
 
-export const AiConfigView: React.FC<AiConfigViewProps> = ({ apiKey, onSaveApiKey }) => {
-  const [dashScopeApiKey, setDashScopeApiKey] = useState(apiKey || '');
+export const AiConfigView: React.FC<AiConfigViewProps> = ({ apiKey: propsApiKey, onSaveApiKey: propsOnSaveApiKey }) => {
+  const storeApiKey = useApiKeyStore((s) => s.dashscopeApiKey);
+  const setStoreApiKey = useApiKeyStore((s) => s.setDashscopeApiKey);
+
+  const effectiveApiKey = propsApiKey !== undefined ? propsApiKey : storeApiKey;
+  const onSaveApiKey = propsOnSaveApiKey || setStoreApiKey;
+
+  const [dashScopeApiKey, setDashScopeApiKey] = useState(effectiveApiKey || '');
   const [openAiApiKey, setOpenAiApiKey] = useState(() => localStorage.getItem('openai_api_key') || '');
   const [llmModel, setLlmModel] = useState('qwen-plus');
   const [ttsProvider, setTtsProvider] = useState<'edge' | 'bailian' | 'local'>('edge');

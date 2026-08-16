@@ -3,9 +3,12 @@ import { AudioAssetItem, AudioCategory, AudioType, Doll } from '../../types';
 import { playSynthPreset, stopCurrentSynth } from '../../utils/audioSynth';
 import { AudioEditorModal } from '../modals/AudioEditorModal';
 import { AssignToChannelModal } from '../modals/AssignToChannelModal';
+import { useAudioAssetStore } from '../../features/audio-assets/store';
+import { useAudioAssetActions } from '../../features/audio-assets/hooks';
+import { useDollStore } from '../../features/dolls/store';
 
 interface AudioAssetsViewProps {
-  assets: AudioAssetItem[];
+  assets?: AudioAssetItem[];
   dolls?: Doll[];
   onAddAsset?: (asset: AudioAssetItem) => void;
   onUpdateAsset?: (asset: AudioAssetItem) => void;
@@ -36,13 +39,31 @@ const ALL_AUDIO_TYPES: (AudioType | 'ALL')[] = [
 ];
 
 export const AudioAssetsView: React.FC<AudioAssetsViewProps> = ({
-  assets,
-  dolls = [],
-  onAddAsset,
-  onUpdateAsset,
-  onDeleteAsset,
-  onAssignToChannel,
+  assets: propsAssets,
+  dolls: propsDolls,
+  onAddAsset: propsOnAddAsset,
+  onUpdateAsset: propsOnUpdateAsset,
+  onDeleteAsset: propsOnDeleteAsset,
+  onAssignToChannel: propsOnAssignToChannel,
 }) => {
+  const storeAssets = useAudioAssetStore((s) => s.audioAssets);
+  const storeDolls = useDollStore((s) => s.dolls);
+  const { saveAsset, deleteAsset, assignAssetToChannel } = useAudioAssetActions();
+
+  const assets = propsAssets || storeAssets;
+  const dolls = propsDolls || storeDolls;
+
+  const onAddAsset = propsOnAddAsset || saveAsset;
+  const onUpdateAsset = propsOnUpdateAsset || saveAsset;
+  const onDeleteAsset = propsOnDeleteAsset || deleteAsset;
+  const onAssignToChannel =
+    propsOnAssignToChannel ||
+    ((assetId: string, dollId: string, channelId: string) => {
+      const targetAsset = assets.find((a) => a.id === assetId);
+      if (targetAsset) {
+        assignAssetToChannel(targetAsset, dollId, channelId);
+      }
+    });
   const [activeCategoryTab, setActiveCategoryTab] = useState<AudioCategory | 'ALL'>('ALL');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<AudioType | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
