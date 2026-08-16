@@ -5,55 +5,45 @@ import json
 import logging
 import os
 from pathlib import Path
-import shutil
 from typing import Any
 from uuid import uuid4
-from fastapi import APIRouter, Query, HTTPException, UploadFile, File, Body
+from fastapi import APIRouter, Query, HTTPException, UploadFile, File, Body, Depends, Response, status
 import httpx
 from pydantic import BaseModel, Field
 
+from app.auth import create_admin_session, require_admin_session
 from app.config import settings
+from app.schemas import (
+    LoginRequest,
+    LoginResponse,
+    ScriptGenerateRequest,
+    AudioRequest,
+    PreviewAudioRequest,
+    GenerativeConfigUpdate,
+    ScriptDraftRequest,
+    ChannelCopyRequest,
+)
+from app.services.channel_freeze_service import freeze_channel
+
+from radio_ai_data import (
+    execute,
+    fetch_all,
+    fetch_one,
+    get_generative_config,
+    get_generative_config_public,
+    update_generative_config,
+    utc_now,
+    NewsRepository,
+    DollRepository,
+    AdminUserRepository,
+    get_all_audio_assets,
+    save_audio_asset_record,
+    delete_audio_asset_record,
+)
+
+from radio_ai_engine import generate_draft_news, generate_channel_copy
 
 logger = logging.getLogger(__name__)
-
-try:
-    from radio_ai_data import (
-        execute,
-        fetch_all,
-        fetch_one,
-        get_generative_config,
-        update_generative_config,
-        utc_now,
-        NewsRepository,
-        DollRepository,
-        get_all_audio_assets,
-        save_audio_asset_record,
-        delete_audio_asset_record,
-    )
-except ImportError:
-    import sys
-    sys.path.append(str(Path(__file__).resolve().parents[3] / "radio-ai-data"))
-    from radio_ai_data import (
-        execute,
-        fetch_all,
-        fetch_one,
-        get_generative_config,
-        update_generative_config,
-        utc_now,
-        NewsRepository,
-        DollRepository,
-        get_all_audio_assets,
-        save_audio_asset_record,
-        delete_audio_asset_record,
-    )
-
-try:
-    from radio_ai_engine import generate_draft_news, generate_channel_copy
-except ImportError:
-    import sys
-    sys.path.append(str(Path(__file__).resolve().parents[3] / "radio-ai-engine"))
-    from radio_ai_engine import generate_draft_news, generate_channel_copy
-
 
 router = APIRouter(tags=["admin"])
 
@@ -62,34 +52,10 @@ class ScriptUpdate(BaseModel):
     text: str = Field(min_length=1, max_length=8000)
 
 
-class AudioRequest(BaseModel):
-    upload_to_oss: bool = False
-    voice_id: str | None = None
-    tts_provider: str | None = None
-
-
-class GenerativeConfigUpdate(BaseModel):
-    default_news_prompt: str | None = None
-    default_llm_provider: str | None = None
-    default_llm_model: str | None = None
-    default_tts_provider: str | None = None
-    default_voice_id: str | None = None
-    dashscope_api_key: str | None = None
-    node_name: str | None = None
-    is_first: bool | None = None
-    is_last: bool | None = None
-    word_count: int | None = None
-
-
 class DraftRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=500)
     category: str = "科技"
     channel_role: str = "默认新闻"
-
-
-class ChannelCopyRequest(BaseModel):
-    doll_name: str = Field(min_length=1, max_length=100)
-    style_keyword: str = Field(default="温暖自然", max_length=200)
 
 
 class DeleteAudioRequest(BaseModel):
@@ -100,114 +66,213 @@ class SaveAvatarRequest(BaseModel):
     image_base64: str
 
 
-@router.get("/api/v1/admin/dashboard")
-def dashboard() -> dict[str, Any]:
-    rows = fetch_all("SELECT * FROM news WHERE deleted_at IS NULL ORDER BY updated_at DESC")
-    counts: dict[str, int] = {}
-    for row in rows:
-        counts[row["tag"]] = counts.get(row["tag"], 0) + 1
+# ==================== Auth Routes (Public) ====================
+
+@router.post("/api/v1/admin/auth/login", response_model=LoginResponse)
+def admin_login(req: LoginRequest, response: Response) -> dict[str, Any]:
+    user = AdminUserRepository.get_by_username(req.username)
+    if not user or not AdminUserRepository.verify_password(req.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+        )
+    token = create_admin_session(req.username)
+    # Set HttpOnly Session Cookie
+    response.set_cookie(
+        key="admin_session",
+        value=token,
+        max_age=settings.admin_session_lifetime_seconds,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # Set true if HTTPS in production
+    )
     return {
-        "category_counts": counts,
-        "recent_news": [NewsRepository.summary_dto(row) for row in rows[:10]],
+        "status": "ok",
+        "username": req.username,
+        "token": token,
     }
 
+
+@router.post("/api/v1/admin/auth/logout")
+def admin_logout(response: Response) -> dict[str, str]:
+    response.delete_cookie(key="admin_session")
+    return {"status": "ok", "message": "已退出登录"}
+
+
+@router.get("/api/v1/admin/auth/me")
+def admin_me(current_user: dict[str, Any] = Depends(require_admin_session)) -> dict[str, Any]:
+    return {"status": "ok", "user": current_user}
+
+
+# ==================== Protected Admin News Routes ====================
 
 @router.get("/api/v1/admin/news")
 def list_news(
-    keyword: str | None = None,
     tag: str | None = None,
-    script_status: str | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
     audio_status: str | None = None,
-    trash: bool = False,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=100, ge=1, le=200),
+    keyword: str | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    include_deleted: bool = False,
+    current_user: dict[str, Any] = Depends(require_admin_session),
 ) -> dict[str, Any]:
-    clauses = ["deleted_at IS NOT NULL" if trash else "deleted_at IS NULL"]
+    where = ["deleted_at IS NULL"] if not include_deleted else ["1=1"]
     params: list[Any] = []
+    if tag:
+        where.append("tag = ?")
+        params.append(tag)
+    if status_filter:
+        where.append("script_status = ?")
+        params.append(status_filter)
+    if audio_status:
+        where.append("audio_status = ?")
+        params.append(audio_status)
     if keyword:
-        clauses.append("(title LIKE ? OR source LIKE ? OR clean_summary LIKE ?)")
-        value = f"%{keyword}%"
-        params.extend([value, value, value])
-    for column, value in (("tag", tag), ("script_status", script_status), ("audio_status", audio_status)):
-        if value:
-            clauses.append(f"{column} = ?")
-            params.append(value)
-    where = " AND ".join(clauses)
-    total = fetch_one(f"SELECT COUNT(*) AS count FROM news WHERE {where}", tuple(params))["count"]
+        where.append("(title LIKE ? OR clean_summary LIKE ? OR script_text LIKE ?)")
+        kw = f"%{keyword}%"
+        params.extend([kw, kw, kw])
+
+    clause = " AND ".join(where)
+    total_row = fetch_one(f"SELECT COUNT(*) AS c FROM news WHERE {clause}", tuple(params))
+    total = total_row["c"] if total_row else 0
+
+    params.extend([limit, offset])
     rows = fetch_all(
-        f"SELECT * FROM news WHERE {where} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-        tuple([*params, page_size, (page - 1) * page_size]),
+        f"SELECT * FROM news WHERE {clause} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+        tuple(params),
     )
-    return {
-        "items": [NewsRepository.summary_dto(row) for row in rows],
-        "page": page,
-        "page_size": page_size,
-        "total": total,
-        "pages": max(1, (total + page_size - 1) // page_size),
-    }
+    items = [NewsRepository.summary_dto(r) for r in rows]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/api/v1/admin/news/trash")
+def list_trash_news(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    total_row = fetch_one("SELECT COUNT(*) AS c FROM news WHERE deleted_at IS NOT NULL")
+    total = total_row["c"] if total_row else 0
+    rows = fetch_all(
+        "SELECT * FROM news WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
+    items = [NewsRepository.summary_dto(r) for r in rows]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/api/v1/admin/news/{news_id}")
-def news_detail(news_id: str) -> dict[str, Any]:
-    return NewsRepository.detail_dto(NewsRepository.require_news(news_id))
+def get_news_detail(
+    news_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    row = NewsRepository.require_news(news_id)
+    return NewsRepository.detail_dto(row)
 
 
-@router.patch("/api/v1/admin/news/{news_id}/script")
-def update_script(news_id: str, request: ScriptUpdate) -> dict[str, Any]:
+@router.put("/api/v1/admin/news/{news_id}/script")
+def update_news_script(
+    news_id: str,
+    req: ScriptUpdate,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     NewsRepository.require_news(news_id)
     execute(
-        "UPDATE news SET script_text=?, script_status='ready', audio_status=CASE WHEN audio_path IS NULL THEN 'missing' ELSE 'stale' END, updated_at=? WHERE id=?",
-        (request.text.strip(), utc_now(), news_id),
+        """UPDATE news SET
+           script_text = ?,
+           script_status = 'ready',
+           audio_status = CASE WHEN audio_path IS NULL THEN 'missing' ELSE 'stale' END,
+           updated_at = ?
+           WHERE id = ?""",
+        (req.text, utc_now(), news_id),
     )
     return NewsRepository.detail_dto(NewsRepository.require_news(news_id))
 
 
-@router.post("/api/v1/admin/news/{news_id}/trash")
-def trash_news(news_id: str) -> dict[str, Any]:
+@router.delete("/api/v1/admin/news/{news_id}")
+def soft_delete_news(
+    news_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     NewsRepository.require_news(news_id)
-    execute("UPDATE news SET deleted_at=?, updated_at=? WHERE id=?", (utc_now(), utc_now(), news_id))
-    return NewsRepository.detail_dto(NewsRepository.require_news(news_id))
+    now = utc_now()
+    execute("UPDATE news SET deleted_at = ?, updated_at = ? WHERE id = ?", (now, now, news_id))
+    return {"status": "ok", "id": news_id, "deleted_at": now}
+
+
+@router.delete("/api/v1/admin/news/{news_id}/permanent")
+def hard_delete_news(
+    news_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    row = NewsRepository.require_news(news_id)
+    if row.get("audio_path"):
+        try:
+            Path(row["audio_path"]).unlink(missing_ok=True)
+        except Exception:
+            pass
+    execute("DELETE FROM news WHERE id = ?", (news_id,))
+    return {"status": "ok", "id": news_id, "permanently_deleted": True}
 
 
 @router.post("/api/v1/admin/news/{news_id}/restore")
-def restore_news(news_id: str) -> dict[str, Any]:
+def restore_news(
+    news_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     NewsRepository.require_news(news_id)
     execute("UPDATE news SET deleted_at=NULL, updated_at=? WHERE id=?", (utc_now(), news_id))
     return NewsRepository.detail_dto(NewsRepository.require_news(news_id))
 
 
+# ==================== Protected Config & Assets Routes ====================
+
 @router.get("/api/v1/radio-ai/generative-config")
-def get_gen_config() -> dict[str, Any]:
-    return get_generative_config()
+def get_gen_config(
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    # Return public masked version
+    return get_generative_config_public()
 
 
 @router.put("/api/v1/radio-ai/generative-config")
-def update_gen_config(req: GenerativeConfigUpdate) -> dict[str, Any]:
-    return update_generative_config(req.model_dump(exclude_unset=True))
+def update_gen_config(
+    req: GenerativeConfigUpdate,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    update_generative_config(req.model_dump(exclude_unset=True))
+    return get_generative_config_public()
 
 
 @router.get("/api/v1/radio-ai/audio-assets")
-def get_audio_assets() -> list[dict[str, Any]]:
+def get_audio_assets(
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> list[dict[str, Any]]:
     return get_all_audio_assets()
 
 
 @router.post("/api/v1/radio-ai/audio-assets")
-def create_or_update_audio_asset(data: dict[str, Any] = Body(...)) -> dict[str, Any]:
+def create_or_update_audio_asset(
+    data: dict[str, Any] = Body(...),
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     return save_audio_asset_record(data)
 
 
-@router.get("/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}/manifest")
-def get_channel_manifest(doll_id: str, channel_id: str) -> dict[str, Any]:
-    manifest_path = settings.audio_dir / "channels" / doll_id / channel_id / "playlist_resource.json"
-    if not manifest_path.exists():
-        raise HTTPException(status_code=404, detail="ESP32 resource manifest not found")
-    import json
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+@router.delete("/api/v1/radio-ai/audio-assets/{asset_id}")
+def delete_audio_asset_endpoint(
+    asset_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, str]:
+    return delete_audio_asset_record(asset_id)
 
 
 @router.post("/api/v1/radio-ai/audio-assets/upload")
-async def upload_audio_asset(file: UploadFile = File(...)) -> dict[str, Any]:
+async def upload_audio_asset(
+    file: UploadFile = File(...),
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     upload_dir = settings.audio_dir / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -219,50 +284,60 @@ async def upload_audio_asset(file: UploadFile = File(...)) -> dict[str, Any]:
     target_path = upload_dir / unique_filename
 
     content = await file.read()
-    with open(target_path, "wb") as f:
-        f.write(content)
+    target_path.write_bytes(content)
 
-    rel_path = target_path.relative_to(settings.audio_dir)
     return {
-        "status": "ok",
-        "url": f"/static/audio/{rel_path.as_posix()}",
-        "filename": original_filename,
+        "status": "success",
+        "filename": unique_filename,
+        "url": f"/static/audio/uploads/{unique_filename}",
         "size_bytes": len(content),
     }
 
 
-@router.delete("/api/v1/radio-ai/audio-assets")
-def remove_audio_asset(request: DeleteAudioRequest) -> dict[str, str]:
-    return delete_audio_asset_record(request.url)
-
-
-@router.post("/api/v1/radio-ai/drafts/news")
-async def draft_news(request: DraftRequest) -> dict[str, Any]:
-    return await generate_draft_news(request.topic, category=request.category, channel_role=request.channel_role)
-
-
-@router.post("/api/v1/radio-ai/drafts/channel-copy")
-def draft_copy(request: ChannelCopyRequest) -> dict[str, str]:
-    return generate_channel_copy(request.doll_name, style_keyword=request.style_keyword)
-
+# ==================== Protected Dolls & Channels Routes ====================
 
 @router.get("/api/v1/radio-ai/dolls")
-def list_dolls() -> list[dict[str, Any]]:
+def list_dolls(
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> list[dict[str, Any]]:
     return DollRepository.get_all_dolls()
 
 
-@router.put("/api/v1/radio-ai/dolls/{doll_id}")
-def save_doll_endpoint(doll_id: str, data: dict[str, Any]) -> dict[str, Any]:
+@router.get("/api/v1/radio-ai/dolls/{doll_id}")
+def get_doll(
+    doll_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    doll = DollRepository.get_doll(doll_id)
+    if not doll:
+        raise HTTPException(status_code=404, detail="玩偶不存在")
+    return doll
+
+
+@router.post("/api/v1/radio-ai/dolls/{doll_id}")
+def save_doll(
+    doll_id: str,
+    data: dict[str, Any] = Body(...),
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     return DollRepository.save_doll(doll_id, data)
 
 
-@router.delete("/api/v1/radio-ai/dolls/{doll_id}")
-def delete_doll_endpoint(doll_id: str) -> dict[str, str]:
-    return DollRepository.delete_doll(doll_id)
+@router.get("/api/v1/radio-ai/dolls/{doll_id}/channels")
+def get_doll_channels(
+    doll_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> list[dict[str, Any]]:
+    return DollRepository.get_channels_by_doll(doll_id)
 
 
-@router.put("/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}")
-def save_channel_endpoint(doll_id: str, channel_id: str, data: dict[str, Any] = Body(...)) -> dict[str, Any]:
+@router.post("/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}")
+def save_channel_endpoint(
+    doll_id: str,
+    channel_id: str,
+    data: dict[str, Any] = Body(...),
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
     return DollRepository.save_channel(doll_id, channel_id, data)
 
 
@@ -271,175 +346,46 @@ async def freeze_channel_endpoint(
     doll_id: str,
     channel_id: str,
     data: dict[str, Any] = Body(...),
+    current_user: dict[str, Any] = Depends(require_admin_session),
 ) -> dict[str, Any]:
-    channel_dir = settings.audio_dir / "channels" / doll_id / channel_id
-    channel_dir.mkdir(parents=True, exist_ok=True)
-
-    playlist = data.get("playlist") or []
-    manifest_playlist = []
-    updated_playlist = []
-
-    for idx, item in enumerate(playlist):
-        item_id = str(item.get("id") or f"p{idx+1}")
-        safe_item_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in item_id)
-        filename_stem = f"node_{safe_item_id}"
-
-        audio_url = item.get("audioUrl") or item.get("audio_url") or ""
-        final_audio_url = None
-        file_size_bytes = 0
-        ext = ".mp3"
-
-        # 1. Check if audio_url is a local static path
-        if audio_url and "/static/audio/" in audio_url:
-            rel_path_str = audio_url.split("/static/audio/", 1)[1].split("?")[0]
-            source_file = (settings.audio_dir / rel_path_str).resolve()
-            if source_file.is_file():
-                ext = source_file.suffix or ".mp3"
-                target_file = channel_dir / f"{filename_stem}{ext}"
-                if source_file != target_file:
-                    shutil.copy2(source_file, target_file)
-                file_size_bytes = target_file.stat().st_size
-                final_audio_url = f"/static/audio/channels/{doll_id}/{channel_id}/{target_file.name}"
-
-        # 2. Check if audio_url is an external HTTP/HTTPS URL
-        elif audio_url and (audio_url.startswith("http://") or audio_url.startswith("https://")):
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.get(audio_url)
-                    if resp.status_code == 200:
-                        ct = resp.headers.get("content-type", "")
-                        ext = ".wav" if "wav" in ct else ".mp3"
-                        target_file = channel_dir / f"{filename_stem}{ext}"
-                        target_file.write_bytes(resp.content)
-                        file_size_bytes = len(resp.content)
-                        final_audio_url = f"/static/audio/channels/{doll_id}/{channel_id}/{target_file.name}"
-            except Exception as e:
-                logger.warning(f"Failed to download audio from {audio_url}: {e}")
-
-        # 3. Check if audio_url is base64 data
-        elif audio_url and audio_url.startswith("data:audio/"):
-            try:
-                b64_part = audio_url.split(",", 1)[1] if "," in audio_url else audio_url
-                raw_bytes = base64.b64decode(b64_part)
-                target_file = channel_dir / f"{filename_stem}.mp3"
-                target_file.write_bytes(raw_bytes)
-                file_size_bytes = len(raw_bytes)
-                final_audio_url = f"/static/audio/channels/{doll_id}/{channel_id}/{target_file.name}"
-            except Exception as e:
-                logger.warning(f"Failed to decode base64 audio: {e}")
-
-        # 4. If still no valid physical file, try TTS synthesis if text snippet exists
-        if not final_audio_url:
-            text_to_speak = item.get("contentSnippet") or item.get("script_text") or item.get("title") or ""
-            if text_to_speak.strip() and not text_to_speak.startswith("["):
-                try:
-                    gen_cfg = get_generative_config()
-                    configured_key = gen_cfg.get("dashscope_api_key") or os.getenv("DASHSCOPE_API_KEY")
-                    voice = item.get("voice_id") or data.get("speaker") or gen_cfg.get("default_voice_id")
-                    provider = item.get("tts_provider") or data.get("ttsProvider") or gen_cfg.get("default_tts_provider", "edge")
-                    payload = {
-                        "text": text_to_speak.strip(),
-                        "voice_id": voice,
-                        "provider": provider,
-                        "api_key": configured_key,
-                    }
-                    async with httpx.AsyncClient(timeout=60.0) as client:
-                        resp = await client.post("http://127.0.0.1:8018/api/generate", json=payload)
-                        if resp.status_code == 200:
-                            ct = resp.headers.get("content-type", "")
-                            ext = ".mp3" if "mpeg" in ct else ".wav"
-                            target_file = channel_dir / f"{filename_stem}{ext}"
-                            target_file.write_bytes(resp.content)
-                            file_size_bytes = len(resp.content)
-                            final_audio_url = f"/static/audio/channels/{doll_id}/{channel_id}/{target_file.name}"
-                except Exception as e:
-                    logger.warning(f"TTS generation failed for node {item_id}: {e}")
-
-        # 5. Fallback: check if target file already exists in channel_dir
-        if not final_audio_url:
-            candidates = list(channel_dir.glob(f"{filename_stem}.*"))
-            if candidates:
-                existing_file = candidates[0]
-                file_size_bytes = existing_file.stat().st_size
-                final_audio_url = f"/static/audio/channels/{doll_id}/{channel_id}/{existing_file.name}"
-            else:
-                final_audio_url = audio_url or None
-
-        # Determine duration
-        duration_seconds = item.get("durationSeconds") or item.get("duration_seconds")
-        if not duration_seconds:
-            text_len = len(item.get("contentSnippet") or item.get("title") or "")
-            duration_seconds = max(2, round(text_len / 4)) if text_len > 0 else 5
-
-        mins = duration_seconds // 60
-        secs = duration_seconds % 60
-        duration_formatted = f"{mins}:{secs:02d}"
-
-        updated_item = {
-            **item,
-            "audioUrl": final_audio_url,
-            "durationSeconds": duration_seconds,
-            "durationFormatted": item.get("durationFormatted") or duration_formatted,
-        }
-        updated_playlist.append(updated_item)
-
-        manifest_entry = {
-            "item_id": item_id,
-            "type": item.get("type", "audio"),
-            "title": item.get("title", ""),
-            "audio_url": final_audio_url,
-            "local_filename": Path(final_audio_url).name if final_audio_url else f"{filename_stem}.mp3",
-            "file_size_bytes": file_size_bytes,
-            "duration_seconds": duration_seconds,
-            "speaker_role": item.get("speakerRole") or item.get("speaker_role", ""),
-        }
-        manifest_playlist.append(manifest_entry)
-
-    total_items = len(manifest_playlist)
-    total_duration = sum(entry["duration_seconds"] for entry in manifest_playlist)
-
-    manifest_data = {
-        "version": "1.0.0",
-        "doll_id": doll_id,
-        "channel_id": channel_id,
-        "channel_name": data.get("channel_name") or data.get("name", ""),
-        "category": data.get("category", "新闻频道"),
-        "updated_at": utc_now(),
-        "total_items": total_items,
-        "total_duration_seconds": total_duration,
-        "playlist": manifest_playlist,
-    }
-
-    manifest_file = channel_dir / "playlist_resource.json"
-    with open(manifest_file, "w", encoding="utf-8") as f:
-        json.dump(manifest_data, f, ensure_ascii=False, indent=2)
-
-    # Save to channel DB
-    channel_record = {
-        **data,
-        "playlist": updated_playlist,
-    }
-    DollRepository.save_channel(doll_id, channel_id, channel_record)
-
-    return {
-        "status": "success",
-        "doll_id": doll_id,
-        "channel_id": channel_id,
-        "manifest_url": f"/static/audio/channels/{doll_id}/{channel_id}/playlist_resource.json",
-        "playlist": updated_playlist,
-        "manifest": manifest_data,
-    }
+    return await freeze_channel(doll_id, channel_id, data)
 
 
 @router.delete("/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}")
-def delete_channel_endpoint(doll_id: str, channel_id: str) -> dict[str, str]:
+def delete_channel_endpoint(
+    doll_id: str,
+    channel_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, str]:
     return DollRepository.delete_channel(doll_id, channel_id)
 
 
 @router.post("/api/v1/radio-ai/dolls/{doll_id}/avatar")
-def update_doll_avatar(doll_id: str, req: SaveAvatarRequest) -> dict[str, Any]:
-    return DollRepository.save_avatar(doll_id, req.image_base64)
+def update_doll_avatar(
+    doll_id: str,
+    req: SaveAvatarRequest,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    try:
+        return DollRepository.save_avatar(doll_id, req.image_base64)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.get("/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}/manifest")
+def get_channel_manifest(
+    doll_id: str,
+    channel_id: str,
+    current_user: dict[str, Any] = Depends(require_admin_session),
+) -> dict[str, Any]:
+    manifest_path = settings.audio_dir / "channels" / doll_id / channel_id / "playlist_resource.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="ESP32 resource manifest not found")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ==================== Protected Logs & Diagnostics ====================
 
 @router.get("/api/v1/admin/logs")
 def get_system_logs(
@@ -447,6 +393,7 @@ def get_system_logs(
     level: str = Query(default="all", description="Log level: all | error | warn | info"),
     limit: int = Query(default=200, ge=10, le=1000),
     keyword: str | None = None,
+    current_user: dict[str, Any] = Depends(require_admin_session),
 ) -> dict[str, Any]:
     base_dir = Path(__file__).resolve().parents[3]
     logs_dir = base_dir / "logs"
@@ -486,14 +433,14 @@ def get_system_logs(
                     continue
 
                 items.append({
-                    "id": f"{src}-{i}-{abs(hash(line_str))}",
+                    "id": f"{src}-{i}",
                     "source": src,
                     "level": log_level,
                     "text": line_str,
                     "timestamp": utc_now(),
                 })
         except Exception as e:
-            print(f"Error reading log file {file_path}: {e}")
+            logger.warning(f"Error reading log file {file_path}: {e}")
 
     return {
         "items": items[-limit:],
@@ -501,8 +448,6 @@ def get_system_logs(
     }
 
 
-# Mount health diagnostic sub-router under /api/v1/admin/health and /api/v1/radio-ai/health
+# Mount health diagnostic sub-router
 from app.admin.health import router as health_router
 router.include_router(health_router)
-
-

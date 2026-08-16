@@ -1,0 +1,59 @@
+{
+  "id": "doll-woody",
+  "doll_id": "MINI-WOODY",
+  "name": "胡迪 Woody",
+  "station_code": "STATION_WOODY",
+  "tagline": "西部警长 / 忠诚义气主持人",
+  "role_title": "正义导播",
+  "status": "online",
+  "avatar_url": "/avatars/MINI-WOODY.png",
+  "prompt": "沉稳正义、充满义气与领导力的警长声音，靴子里有只靴蛇的经典幽默。",
+  "series": "迪士尼IP",
+  "speaker": "cosyvoice-v3.5-plus-hudi-a528aa91d91e4beab1ef260045ed923e",
+  "agent_app_id": "mm_7bbe89a25aef4ad99c28f31d7eb4",
+  "intro_script": "我的靴子里有只靴蛇！我是胡迪警长，欢迎收听西部特报。",
+  "outro_script": "伙伴们，保持警惕，我们是一家人！",
+  "channels": [
+    {
+      "id": "var-woody-1",
+      "channel_id": "CH-WOODY-01",
+      "name": "胡迪警长西部正义频道",
+      "code": "CH-WOODY-01",
+      "category": "新闻频道",
+      "categories": ["西部特快", "玩具正义联盟"],
+      "prompt": "沉稳正义、充满义气与领导力的警长声音，靴子里有只靴蛇的经典幽默。",
+      "intro_script": "我的靴子里有只靴蛇！我是胡迪警长，欢迎收听西部特报。",
+      "outro_script": "伙伴们，保持警惕，我们是一家人！",
+      "is_live": 1,
+      "playlist": [
+        {
+          "id": "wd-p1",
+          "type": "intro",
+          "title": "【西部号角】胡迪警长开场口哨",
+          "speakerRole": "胡迪警长",
+          "durationSeconds": 10,
+          "durationFormatted": "0:10",
+          "contentSnippet": "我的靴子里有只靴蛇！西部警长广播站开播！"
+        },
+        {
+          "id": "wd-p2",
+          "type": "news_script",
+          "title": "正义特报：玩具总动员联盟完成年度巡逻任务",
+          "speakerRole": "胡迪警长",
+          "durationSeconds": 50,
+          "durationFormatted": "0:50",
+          "contentSnippet": "报告大家，安迪的房间目前一切安全！"
+        },
+        {
+          "id": "wd-p3",
+          "type": "outro",
+          "title": "【西部号角】牛仔友情谢幕曲",
+          "speakerRole": "胡迪警长",
+          "durationSeconds": 15,
+          "durationFormatted": "0:15",
+          "contentSnippet": "记住，无论遇到什么困难，你都有我这个朋友！"
+        }
+      ]
+    }
+  ]
+}

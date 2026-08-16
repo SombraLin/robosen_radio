@@ -9,47 +9,41 @@ interface ApiKeyState {
   setGeminiApiKey: (key: string) => void;
   setSettingsModalOpen: (open: boolean) => void;
   loadFromStorageAndApi: () => Promise<void>;
+  saveToServer: (key: string) => Promise<void>;
 }
 
 export const useApiKeyStore = create<ApiKeyState>((set) => ({
-  dashscopeApiKey:
-    localStorage.getItem('RADIO_AI_DASHSCOPE_API_KEY') ||
-    localStorage.getItem('dashscope_api_key') ||
-    '',
-  geminiApiKey:
-    localStorage.getItem('RADIO_AI_GEMINI_API_KEY') ||
-    localStorage.getItem('gemini_api_key') ||
-    '',
+  dashscopeApiKey: '',
+  geminiApiKey: '',
   isSettingsModalOpen: false,
-  setDashscopeApiKey: (key: string) => {
-    try {
-      localStorage.setItem('RADIO_AI_DASHSCOPE_API_KEY', key);
-      localStorage.setItem('dashscope_api_key', key);
-    } catch (e) {
-      console.error('Failed to save dashscopeApiKey:', e);
-    }
-    set({ dashscopeApiKey: key });
-  },
-  setGeminiApiKey: (key: string) => {
-    try {
-      localStorage.setItem('RADIO_AI_GEMINI_API_KEY', key);
-      localStorage.setItem('gemini_api_key', key);
-    } catch (e) {
-      console.error('Failed to save geminiApiKey:', e);
-    }
-    set({ geminiApiKey: key });
-  },
+  setDashscopeApiKey: (key: string) => set({ dashscopeApiKey: key }),
+  setGeminiApiKey: (key: string) => set({ geminiApiKey: key }),
   setSettingsModalOpen: (open: boolean) => set({ isSettingsModalOpen: open }),
   loadFromStorageAndApi: async () => {
     if (isRadioAiApiEnabled()) {
       try {
-        const cfg = await requestJson<any>('/api/v1/radio-ai/generative-config');
+        const cfg = await requestJson<{ dashscope_api_key?: string }>('/api/v1/radio-ai/generative-config');
         if (cfg && cfg.dashscope_api_key) {
           set({ dashscopeApiKey: cfg.dashscope_api_key });
-          localStorage.setItem('RADIO_AI_DASHSCOPE_API_KEY', cfg.dashscope_api_key);
         }
       } catch (e) {
-        console.warn('获取服务端 API Key 失败:', e);
+        console.warn('获取服务端脱敏 API Key 失败:', e);
+      }
+    }
+  },
+  saveToServer: async (newKey: string) => {
+    if (isRadioAiApiEnabled() && newKey.trim()) {
+      try {
+        const cfg = await requestJson<{ dashscope_api_key?: string }>('/api/v1/radio-ai/generative-config', {
+          method: 'PUT',
+          body: JSON.stringify({ dashscope_api_key: newKey.trim() }),
+        });
+        if (cfg && cfg.dashscope_api_key) {
+          set({ dashscopeApiKey: cfg.dashscope_api_key });
+        }
+      } catch (e) {
+        console.error('保存 API Key 到服务端失败:', e);
+        throw e;
       }
     }
   },

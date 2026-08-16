@@ -3,25 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
-try:
-    from radio_ai_data import execute, fetch_all, utc_now, DOLL_NAME_MAP
-except ImportError:
-    import sys
-    sys.path.append(str(Path(__file__).resolve().parents[3] / "radio-ai-data"))
-    from radio_ai_data import execute, fetch_all, utc_now, DOLL_NAME_MAP
+from app.auth import require_device_token
+from radio_ai_data import execute, fetch_all, utc_now, DOLL_NAME_MAP
+from radio_ai_engine import generate_script
 
-try:
-    from radio_ai_engine import generate_script
-except ImportError:
-    import sys
-    sys.path.append(str(Path(__file__).resolve().parents[3] / "radio-ai-engine"))
-    from radio_ai_engine import generate_script
-
-
-router = APIRouter(tags=["device"])
+router = APIRouter(tags=["device"], dependencies=[Depends(require_device_token)])
 
 
 class PlaybackStatusRequest(BaseModel):

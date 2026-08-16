@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from pathlib import Path
 import struct
 import wave
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
 
 def write_demo_wav(text: str, output_path: Path) -> tuple[int, int]:
     sample_rate = 16_000
@@ -36,16 +40,7 @@ async def synthesize(
         raise ValueError("播报稿为空，无法生成音频")
 
     voice = (voice_id or settings.default_voice).strip()
-
-    # Determine TTS provider
-    if tts_provider:
-        provider = tts_provider.strip().lower()
-    elif voice.startswith("zh-") and "Neural" in voice:
-        provider = "edge"
-    elif voice.startswith("cosyvoice") or voice.endswith("_v3") or "lotso" in voice or "xiaoxin" in voice or "wanzi" in voice or "hudi" in voice:
-        provider = "bailian"
-    else:
-        provider = settings.tts_provider
+    provider = (tts_provider or settings.tts_provider or "edge").strip().lower()
 
     if provider == "local":
         path = output_stem.with_suffix(".wav")
@@ -87,9 +82,9 @@ async def synthesize(
                     path.write_bytes(data)
                     success = True
                 else:
-                    print(f"[TTS Synthesizer Warning] 百炼未返回有效音频，准备降级为 Edge-TTS")
+                    logger.warning("百炼未返回有效音频，准备降级为 Edge-TTS")
             except Exception as err:
-                print(f"[TTS Synthesizer Warning] 阿里百炼 CosyVoice 生成异常 ({err})，自动降级为 Edge-TTS 免费音色...")
+                logger.warning(f"阿里百炼 CosyVoice 生成异常 ({err})，自动降级为 Edge-TTS 免费音色...", exc_info=True)
 
         if not success:
             try:
@@ -103,6 +98,6 @@ async def synthesize(
                 edge_voice = "zh-CN-YunxiNeural"
             await edge_tts.Communicate(text=text, voice=edge_voice).save(str(path))
     else:
-        raise ValueError(f"不支持的 TTS：{provider}")
+        raise ValueError(f"不支持的 TTS Provider：{provider}")
 
     return path, max(1, round(len(text) / 4)), path.stat().st_size

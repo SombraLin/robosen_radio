@@ -103,13 +103,21 @@ export interface NewsPipelineResultDto {
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('radio_ai_admin_token');
+  const headers = new Headers(init?.headers);
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
+  if (init?.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
+    headers,
     credentials: 'include',
   });
   if (!response.ok) {
@@ -327,11 +335,32 @@ export function updateNewsScript(newsId: string, text: string): Promise<AdminNew
   });
 }
 
-export function generateNewsScript(newsId: string, options?: { customPrompt?: string; llmModel?: string }): Promise<AdminNewsDetailDto> {
-  return requestJson(`/api/v1/radio-ai/news/${encodeURIComponent(newsId)}/script/generate`, {
+export async function pollNewsUntilFinished(
+  newsId: string,
+  field: 'script_status' | 'audio_status',
+  maxAttempts = 30,
+  intervalMs = 2000
+): Promise<AdminNewsDetailDto> {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    const detail = await getNewsDetail(newsId);
+    const status = detail[field];
+    if (status === 'ready' || status === 'failed') {
+      if (status === 'failed') {
+        throw new Error(detail.failure_message || `${field} 处理失败`);
+      }
+      return detail;
+    }
+  }
+  return getNewsDetail(newsId);
+}
+
+export async function generateNewsScript(newsId: string, options?: { customPrompt?: string; llmModel?: string }): Promise<AdminNewsDetailDto> {
+  await requestJson(`/api/v1/radio-ai/news/${encodeURIComponent(newsId)}/script/generate`, {
     method: 'POST',
     body: options ? JSON.stringify({ custom_prompt: options.customPrompt, llm_model: options.llmModel }) : undefined,
   });
+  return pollNewsUntilFinished(newsId, 'script_status');
 }
 
 export function updateCommentary(commentaryId: string, text: string): Promise<AdminNewsDetailDto> {
@@ -349,12 +378,15 @@ export function restoreNews(newsId: string): Promise<AdminNewsDetailDto> {
   return requestJson(`/api/v1/admin/news/${encodeURIComponent(newsId)}/restore`, { method: 'POST' });
 }
 
-export function regenerateNewsAudio(newsId: string, voiceId?: string, ttsProvider?: string): Promise<{ status: string; audio: AdminAudioDto }> {
-  return requestJson(`/api/v1/admin/news/${encodeURIComponent(newsId)}/audio/regenerate`, {
+export async function regenerateNewsAudio(newsId: string, voiceId?: string, ttsProvider?: string): Promise<{ status: string; audio: AdminAudioDto }> {
+  await requestJson(`/api/v1/admin/news/${encodeURIComponent(newsId)}/audio/regenerate`, {
     method: 'POST',
     body: JSON.stringify({ upload_to_oss: false, voice_id: voiceId || null, tts_provider: ttsProvider || null }),
   });
+  const detail = await pollNewsUntilFinished(newsId, 'audio_status');
+  return { status: detail.audio.status, audio: detail.audio };
 }
+
 
 export function regenerateCommentaryAudio(commentaryId: string): Promise<{ status: string; audio: AdminAudioDto }> {
   return requestJson(`/api/v1/admin/commentaries/${encodeURIComponent(commentaryId)}/audio/regenerate`, {

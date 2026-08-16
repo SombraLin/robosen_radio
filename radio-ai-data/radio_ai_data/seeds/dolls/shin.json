@@ -1,0 +1,59 @@
+{
+  "id": "doll-robot-a1",
+  "doll_id": "MINI-ROBOT-A1",
+  "name": "野原新之助 (康达姆 A1)",
+  "station_code": "STATION_ROBOT_A1",
+  "tagline": "双叶幼儿园特命主播 / 幽默爆笑特刊",
+  "role_title": "搞笑特派员",
+  "status": "online",
+  "avatar_url": "/avatars/MINI-ROBOT-A1.png",
+  "prompt": "充满童趣与无厘头的搞笑播报风格，充满大象舞与康达姆机器人的幽默活力。",
+  "series": "日系IP",
+  "speaker": "cosyvoice-v3.5-plus-xiaoxin-38bc6f91ce58475bbc8c9a5d534b3a64",
+  "agent_app_id": "mm_d1684ee2f57d4a44a8c23bef905c",
+  "intro_script": "你好！我是野原新之助，今天为你带来超酷的康达姆机器人 A1 特报！",
+  "outro_script": "动感超人，beam！今天的新闻就到这里啦！",
+  "channels": [
+    {
+      "id": "var-robot-a1",
+      "channel_id": "CH-ROBOT-A1",
+      "name": "新之助 - 康达姆机器人 A1 频道",
+      "code": "CH-ROBOT-A1",
+      "category": "新闻频道",
+      "categories": ["动漫爆笑", "儿童特快"],
+      "prompt": "充满童趣与无厘头的搞笑播报风格，充满大象舞与康达姆机器人的幽默活力。",
+      "intro_script": "你好！我是野原新之助，今天为你带来超酷的康达姆机器人 A1 特报！",
+      "outro_script": "动感超人，beam！今天的新闻就到这里啦！",
+      "is_live": 1,
+      "playlist": [
+        {
+          "id": "shin-p1",
+          "type": "intro",
+          "title": "【动感开场】动感超人 Beam 警报音效",
+          "speakerRole": "野原新之助",
+          "durationSeconds": 10,
+          "durationFormatted": "0:10",
+          "contentSnippet": "哇哈哈哈哈！动感新之助频道开播啦！"
+        },
+        {
+          "id": "shin-p2",
+          "type": "news_script",
+          "title": "爆笑新闻：春日部防卫队发现巨型巧克力饼干遗迹",
+          "speakerRole": "野原新之助",
+          "durationSeconds": 40,
+          "durationFormatted": "0:40",
+          "contentSnippet": "大消息大消息！美冴今天买的巧克力饼干被我找到啦！"
+        },
+        {
+          "id": "shin-p3",
+          "type": "outro",
+          "title": "【动感谢幕】小白回家广播",
+          "speakerRole": "野原新之助",
+          "durationSeconds": 10,
+          "durationFormatted": "0:10",
+          "contentSnippet": "小白，散步时间到了，走咯！"
+        }
+      ]
+    }
+  ]
+}

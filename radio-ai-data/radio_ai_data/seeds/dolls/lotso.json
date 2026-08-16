@@ -1,0 +1,86 @@
+{
+  "id": "doll-lotso",
+  "doll_id": "MINI-LOTSO",
+  "name": "草莓熊 Lotso",
+  "station_code": "STATION_LOTSO",
+  "tagline": "草莓香味玩具总动员专栏主播",
+  "role_title": "治愈系主播",
+  "status": "online",
+  "avatar_url": "/avatars/MINI-LOTSO.png",
+  "prompt": "带着浓郁草莓香味的软萌玩偶，用温暖憨厚的语调聊聊生活中的童真与美好。",
+  "series": "迪士尼IP",
+  "speaker": "cosyvoice-v3.5-plus-lotso-49ffdf5a5c024a6499a4e7e904ed3cc5",
+  "agent_app_id": "mm_a2b2711e18cc4c77a73b83369675",
+  "intro_script": "你好呀！我是草莓熊，闻到草莓香气了吗？欢迎收听今日特刊。",
+  "outro_script": "今天也要像草莓一样甜甜的哦，我们下次见！",
+  "channels": [
+    {
+      "id": "var-lotso-1",
+      "channel_id": "CH-LOTSO-01",
+      "name": "草莓熊治愈特刊频道",
+      "code": "CH-LOTSO-01",
+      "category": "新闻频道",
+      "categories": ["玩具特刊", "童趣感语"],
+      "prompt": "带着浓郁草莓香味的软萌玩偶，用温暖憨厚的语调聊聊生活中的童真与美好。",
+      "intro_script": "你好呀！我是草莓熊，闻到草莓香气了吗？欢迎收听今日特刊。",
+      "outro_script": "今天也要像草莓一样甜甜的哦，我们下次见！",
+      "is_live": 1,
+      "playlist": [
+        {
+          "id": "lotso-p1",
+          "type": "intro",
+          "title": "【草莓熊广播站】今日热点新闻片头 Jingle",
+          "speakerRole": "草莓熊 (主播)",
+          "durationSeconds": 12,
+          "durationFormatted": "0:12",
+          "contentSnippet": "草莓香味广播站，陪伴你的每一刻~"
+        },
+        {
+          "id": "lotso-p2",
+          "type": "transition",
+          "title": "草莓软糖卡顿转场音",
+          "speakerRole": "系统音效",
+          "durationSeconds": 5,
+          "durationFormatted": "0:05",
+          "contentSnippet": "[啾啾啾~ 草莓软糖碰撞声]"
+        },
+        {
+          "id": "lotso-p3",
+          "type": "news_script",
+          "title": "科技快讯：全球 AI 虚拟玩偶交互技术迎来里程碑",
+          "speakerRole": "男主持人",
+          "durationSeconds": 45,
+          "durationFormatted": "0:45",
+          "contentSnippet": "今日，新型智能玩偶算法成功实现了声音与情感的高度拟真..."
+        },
+        {
+          "id": "lotso-p4",
+          "type": "news_script",
+          "title": "文化焦点：童趣 IP 结合智能硬件引领消费新浪潮",
+          "speakerRole": "女主持人",
+          "durationSeconds": 50,
+          "durationFormatted": "0:50",
+          "contentSnippet": "越来越多消费者选择具备语音陪伴功能的实体玩偶作为办公桌治愈伙伴..."
+        },
+        {
+          "id": "lotso-p5",
+          "type": "commentary",
+          "title": "草莓熊独家点评：科技不仅要有速度，更要有温度和草莓香味！",
+          "speakerRole": "草莓熊 (主播)",
+          "durationSeconds": 30,
+          "durationFormatted": "0:30",
+          "contentSnippet": "哼哼，我觉得嘛，不管算法多厉害，最重要的还是抱起来软软的！"
+        },
+        {
+          "id": "lotso-p6",
+          "type": "outro",
+          "title": "【草莓熊广播站】谢幕曲与晚安提示",
+          "speakerRole": "草莓熊 (主播)",
+          "durationSeconds": 15,
+          "durationFormatted": "0:15",
+          "contentSnippet": "好啦，今天的新闻特刊就到这里，祝你今晚做个甜甜的草莓梦！"
+        }
+      ]
+    }
+  ]
+}

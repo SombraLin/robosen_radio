@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from app.config import settings
+from radio_ai_data.repositories import DeviceRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["device-theater"])
 
@@ -12,7 +18,6 @@ class TheaterRoomManager:
         self.active_rooms: dict[str, dict[str, WebSocket]] = {}
 
     async def connect(self, room_id: str, doll_id: str, websocket: WebSocket) -> None:
-        await websocket.accept()
         if room_id not in self.active_rooms:
             self.active_rooms[room_id] = {}
         self.active_rooms[room_id][doll_id] = websocket
@@ -39,35 +44,58 @@ theater_manager = TheaterRoomManager()
 
 @router.websocket("/ws/v1/device/theater/channel-session")
 async def theater_websocket_endpoint(websocket: WebSocket) -> None:
+    await websocket.accept()
     room_id = "default-room"
     doll_id = "unknown"
+    authenticated = False
+
     try:
         data_text = await websocket.receive_text()
         init_data = json.loads(data_text)
         if init_data.get("event") == "JOIN_ROOM":
             room_id = str(init_data.get("room_id", "default-room"))
-            doll_id = str(init_data.get("doll_id", "unknown"))
+            claimed_doll_id = str(init_data.get("doll_id", "unknown"))
+            device_sn = init_data.get("device_sn")
+            token = init_data.get("token")
 
-        await theater_manager.connect(room_id, doll_id, websocket)
-        await theater_manager.broadcast(room_id, {
-            "event": "ROOM_READY",
-            "room_id": room_id,
-            "speakers": list(theater_manager.active_rooms.get(room_id, {}).keys()),
-        })
-
-        while True:
-            msg_text = await websocket.receive_text()
-            event_payload = json.loads(msg_text)
-            event_name = event_payload.get("event")
-
-            if event_name == "ACT_FINISHED":
-                await theater_manager.broadcast(room_id, {
-                    "event": "NEXT_ACT_TRIGGER",
-                    "finished_act_id": event_payload.get("act_id"),
-                    "finished_speaker": doll_id,
-                })
+            # Validate device authentication
+            if device_sn and token:
+                if DeviceRepository.verify_device_token(device_sn, token):
+                    doll_id = claimed_doll_id
+                    authenticated = True
+                else:
+                    await websocket.send_text(json.dumps({"event": "AUTH_FAILED", "message": "设备 Token 校验失败"}))
+                    await websocket.close(code=1008)
+                    return
+            elif settings.allow_anonymous_device:
+                doll_id = claimed_doll_id
+                authenticated = True
             else:
-                await theater_manager.broadcast(room_id, event_payload, sender_doll_id=doll_id)
+                await websocket.send_text(json.dumps({"event": "AUTH_FAILED", "message": "未提供设备凭据"}))
+                await websocket.close(code=1008)
+                return
+
+        if authenticated:
+            await theater_manager.connect(room_id, doll_id, websocket)
+            await theater_manager.broadcast(room_id, {
+                "event": "ROOM_READY",
+                "room_id": room_id,
+                "speakers": list(theater_manager.active_rooms.get(room_id, {}).keys()),
+            })
+
+            while True:
+                msg_text = await websocket.receive_text()
+                event_payload = json.loads(msg_text)
+                event_name = event_payload.get("event")
+
+                if event_name == "ACT_FINISHED":
+                    await theater_manager.broadcast(room_id, {
+                        "event": "NEXT_ACT_TRIGGER",
+                        "finished_act_id": event_payload.get("act_id"),
+                        "finished_speaker": doll_id,
+                    })
+                else:
+                    await theater_manager.broadcast(room_id, event_payload, sender_doll_id=doll_id)
 
     except WebSocketDisconnect:
         theater_manager.disconnect(room_id, doll_id)
@@ -76,5 +104,6 @@ async def theater_websocket_endpoint(websocket: WebSocket) -> None:
             "room_id": room_id,
             "doll_id": doll_id,
         })
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Theater websocket error: {e}")
         theater_manager.disconnect(room_id, doll_id)

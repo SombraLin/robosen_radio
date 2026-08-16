@@ -148,6 +148,16 @@ def delete_audio_asset_record(asset_id_or_url: str) -> dict[str, str]:
     return {"status": "ok", "deleted": asset_id_or_url}
 
 
+def safe_resolve_audio_path(rel_path: str) -> Path:
+    if ".." in rel_path or rel_path.startswith("/") or "\\" in rel_path:
+        raise ValueError("非法路径")
+    target = (settings.audio_dir / rel_path).resolve()
+    audio_dir_resolved = settings.audio_dir.resolve()
+    if not str(target).startswith(str(audio_dir_resolved)):
+        raise ValueError("路径超出音频目录范围")
+    return target
+
+
 def delete_audio_asset(url: str) -> dict[str, str]:
     """Delete a physical audio file given its static URL path."""
     STATIC_PREFIX = "/static/audio/"
@@ -155,16 +165,14 @@ def delete_audio_asset(url: str) -> dict[str, str]:
         raise KeyError(f"Invalid audio URL: {url}")
 
     rel_path = url[len(STATIC_PREFIX):]
-    if ".." in rel_path:
-        raise KeyError("Invalid path")
-
-    target = (settings.audio_dir / rel_path).resolve()
-    audio_dir_resolved = settings.audio_dir.resolve()
-    if not str(target).startswith(str(audio_dir_resolved)):
-        raise KeyError("Path not within audio directory")
+    try:
+        target = safe_resolve_audio_path(rel_path)
+    except ValueError as e:
+        raise KeyError(str(e))
 
     if not target.exists():
         raise KeyError(f"File not found: {rel_path}")
 
     target.unlink()
     return {"status": "deleted", "path": rel_path}
+

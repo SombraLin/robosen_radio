@@ -331,22 +331,38 @@ class DollRepository:
         except Exception as e:
             raise ValueError(f"Invalid base64 image data: {e}")
 
+        # Check size limit: 5MB
+        if len(img_bytes) > 5 * 1024 * 1024:
+            raise ValueError("头像文件大小超过 5MB 限制")
+
+        # Verify image format via Pillow
+        import io
+        from PIL import Image
+        try:
+            image = Image.open(io.BytesIO(img_bytes))
+            image.verify()
+        except Exception as e:
+            raise ValueError(f"无效的图片格式: {e}")
+
         base_path = Path(__file__).resolve().parent.parent.parent.parent
         assets_dir = base_path / "assets" / "avatar" / "dolls"
         public_dir = base_path / "public" / "avatars"
-        assets_dir.mkdir(parents=True, exist_ok=True)
-        public_dir.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            assets_dir.mkdir(parents=True, exist_ok=True)
+            public_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{doll_id}.png"
+            (assets_dir / filename).write_bytes(img_bytes)
+            (public_dir / filename).write_bytes(img_bytes)
 
-        filename = f"{doll_id}.png"
-        (assets_dir / filename).write_bytes(img_bytes)
-        (public_dir / filename).write_bytes(img_bytes)
-
-        doll_name = DOLL_NAME_MAP.get(doll_id, "")
-        if doll_name:
-            clean_name = doll_name.replace(" ", "").replace("/", "_")
-            desc_name = f"{doll_id}_{clean_name}.png"
-            (assets_dir / desc_name).write_bytes(img_bytes)
-            (public_dir / desc_name).write_bytes(img_bytes)
+            doll_name = DOLL_NAME_MAP.get(doll_id, "")
+            if doll_name:
+                clean_name = doll_name.replace(" ", "").replace("/", "_")
+                desc_name = f"{doll_id}_{clean_name}.png"
+                (assets_dir / desc_name).write_bytes(img_bytes)
+                (public_dir / desc_name).write_bytes(img_bytes)
+        except Exception:
+            pass
 
         timestamp = int(time.time())
         avatar_url = f"/avatars/{doll_id}.png?t={timestamp}"
@@ -355,6 +371,38 @@ class DollRepository:
             "status": "success",
             "doll_id": doll_id,
             "avatar_url": avatar_url,
-            "assets_file": str(assets_dir / filename),
-            "public_file": str(public_dir / filename),
+            "assets_file": str(assets_dir / f"{doll_id}.png"),
+            "public_file": str(public_dir / f"{doll_id}.png"),
         }
+
+
+class AdminUserRepository:
+    @staticmethod
+    def get_by_username(username: str) -> dict[str, Any] | None:
+        return fetch_one("SELECT * FROM admin_users WHERE username = ?", (username,))
+
+    @staticmethod
+    def verify_password(plain_password: str, password_hash: str) -> bool:
+        import bcrypt
+        try:
+            return bcrypt.checkpw(plain_password.encode("utf-8"), password_hash.encode("utf-8"))
+        except Exception:
+            return False
+
+
+class DeviceRepository:
+    @staticmethod
+    def get_by_sn(device_sn: str) -> dict[str, Any] | None:
+        return fetch_one("SELECT * FROM devices WHERE device_sn = ?", (device_sn,))
+
+    @staticmethod
+    def verify_device_token(device_sn: str, token: str) -> bool:
+        device = DeviceRepository.get_by_sn(device_sn)
+        if not device or device.get("status") != "active":
+            return False
+        import bcrypt
+        try:
+            return bcrypt.checkpw(token.encode("utf-8"), device["token_hash"].encode("utf-8"))
+        except Exception:
+            return False
+

@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ThemeSelector } from './ThemeSelector';
 import { ThemeId } from '../theme';
-import { useThemeStore } from '../shared/store/useThemeStore';
 import { useApiKeyStore } from '../shared/store/useApiKeyStore';
+import { useAuthStore } from '../shared/store/useAuthStore';
 
 interface HeaderProps {
   pageTitle?: string;
@@ -30,14 +30,23 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
   const settingsRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const setApiKeyModalOpen = useApiKeyStore((s) => s.setSettingsModalOpen);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const username = useAuthStore((s) => s.username);
+  const openLoginModal = useAuthStore((s) => s.openLoginModal);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setIsSettingsOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -60,6 +69,11 @@ export const Header: React.FC<HeaderProps> = ({
     } else {
       navigate('/atlas');
     }
+  };
+
+  const handleLogout = async () => {
+    setIsUserMenuOpen(false);
+    await logout();
   };
 
   return (
@@ -195,12 +209,73 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        <div className="w-9 h-9 rounded-full border border-[var(--accent)]/40 overflow-hidden ml-1 shrink-0">
-          <img
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUQomoKY-MiiMkslfgWRawHDQAYHyDwLpvYV_QcjT47SqDjgPpk9aCfB2WumegWGkrXhsW468SqWzfzYEaoWaSLYkedYmDdiMnxDGSEhsXzGiXisrh_i4qfJa3YXfmuWJkOnOX4EJrwAV13VtjfkpmiJXMJdRWYWk1IwwC9YinfY91ZQKPwUjltrXgFO0krZ-jJrUX7HBrBUTsgfX4c8Ln46_0a4rVJThsNyH9w0w9-moQEMrxvLFJ0Q"
-            alt="User Avatar"
-            className="w-full h-full object-cover"
-          />
+        {/* User Auth Menu & Avatar Section */}
+        <div className="relative" ref={userMenuRef}>
+          {isAuthenticated ? (
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 pl-2 pr-1.5 py-1 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)] rounded-full transition-all cursor-pointer group"
+              title="用户与鉴权管理"
+            >
+              <div className="text-right hidden sm:block">
+                <div className="text-xs font-bold font-serif-editorial text-[var(--text-primary)] leading-tight flex items-center gap-1">
+                  <span>{username || 'admin'}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                </div>
+                <div className="text-[9px] font-data-mono text-[var(--accent)] leading-tight">管理员</div>
+              </div>
+              <div className="w-8 h-8 rounded-full border border-[var(--accent)]/40 overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+                <img
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUQomoKY-MiiMkslfgWRawHDQAYHyDwLpvYV_QcjT47SqDjgPpk9aCfB2WumegWGkrXhsW468SqWzfzYEaoWaSLYkedYmDdiMnxDGSEhsXzGiXisrh_i4qfJa3YXfmuWJkOnOX4EJrwAV13VtjfkpmiJXMJdRWYWk1IwwC9YinfY91ZQKPwUjltrXgFO0krZ-jJrUX7HBrBUTsgfX4c8Ln46_0a4rVJThsNyH9w0w9-moQEMrxvLFJ0Q"
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={openLoginModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)] text-[var(--accent)] text-xs font-serif-editorial font-bold rounded-full hover:bg-[var(--accent)] hover:text-[var(--accent-text)] transition-all cursor-pointer shadow-sm animate-pulse"
+              title="点击登录管理员账号"
+            >
+              <span className="material-symbols-outlined text-sm">login</span>
+              <span>管理员登录</span>
+            </button>
+          )}
+
+          {/* User Dropdown Menu */}
+          {isUserMenuOpen && isAuthenticated && (
+            <div className="absolute right-0 top-12 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-md shadow-2xl z-50 py-2 animate-fadeIn border-t-2 border-t-[var(--accent)] font-sans">
+              <div className="px-4 py-2 border-b border-[var(--border-color)]">
+                <div className="text-xs font-bold text-[var(--text-primary)] font-serif-editorial">
+                  {username || 'admin'} (超级管理员)
+                </div>
+                <div className="text-[10px] font-data-mono text-green-500 mt-0.5 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                  <span>已获取后台编辑与写权限</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  openLoginModal();
+                }}
+                className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-subcard)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">switch_account</span>
+                <span>切换管理员账号</span>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer border-t border-[var(--border-color)]"
+              >
+                <span className="material-symbols-outlined text-base">logout</span>
+                <span>退出登录</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

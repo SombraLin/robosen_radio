@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / ".env")
 
 
-@dataclass(frozen=True)
+@dataclass
 class Settings:
     database_path: Path = Path(os.getenv("RADIO_AI_DATABASE_PATH", BASE_DIR / "data" / "radio_ai.db"))
     audio_dir: Path = Path(os.getenv("RADIO_AI_AUDIO_DIR", BASE_DIR / "data" / "audio"))

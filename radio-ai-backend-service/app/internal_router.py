@@ -1,26 +1,28 @@
 from typing import Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-try:
-    from radio_ai_data import execute, utc_now
-except ImportError:
-    import sys
-    from pathlib import Path
-    sys.path.append(str(Path(__file__).resolve().parents[3] / "radio-ai-data"))
-    from radio_ai_data import execute, utc_now
+from app.auth import require_internal_secret
+from radio_ai_data import execute, utc_now
 
-internal_router = APIRouter(prefix="/api/v1/internal", tags=["Internal"])
+internal_router = APIRouter(
+    prefix="/api/v1/internal",
+    tags=["Internal"],
+    dependencies=[Depends(require_internal_secret)],
+)
+
 
 class UpdateScriptRequest(BaseModel):
     script_text: str
     custom_prompt: str | None = None
     llm_model: str | None = None
 
+
 class UpdateScriptStatusRequest(BaseModel):
     status: str
     failure_stage: str | None = None
     failure_message: str | None = None
+
 
 class UpdateAudioRequest(BaseModel):
     audio_path: str
@@ -29,10 +31,12 @@ class UpdateAudioRequest(BaseModel):
     voice_id: str
     tts_provider: str
 
+
 class UpdateAudioStatusRequest(BaseModel):
     status: str
     failure_stage: str | None = None
     failure_message: str | None = None
+
 
 @internal_router.put("/news/{news_id}/script")
 def update_news_script(news_id: str, request: UpdateScriptRequest) -> dict[str, Any]:
@@ -42,6 +46,7 @@ def update_news_script(news_id: str, request: UpdateScriptRequest) -> dict[str, 
     )
     return {"status": "ok"}
 
+
 @internal_router.put("/news/{news_id}/script/status")
 def update_news_script_status(news_id: str, request: UpdateScriptStatusRequest) -> dict[str, Any]:
     execute(
@@ -50,6 +55,7 @@ def update_news_script_status(news_id: str, request: UpdateScriptStatusRequest) 
     )
     return {"status": "ok"}
 
+
 @internal_router.put("/news/{news_id}/audio")
 def update_news_audio(news_id: str, request: UpdateAudioRequest) -> dict[str, Any]:
     execute(
@@ -57,6 +63,7 @@ def update_news_audio(news_id: str, request: UpdateAudioRequest) -> dict[str, An
         (request.audio_path, request.audio_duration_seconds, request.audio_size_bytes, request.voice_id, request.tts_provider, utc_now(), news_id),
     )
     return {"status": "ok"}
+
 
 @internal_router.put("/news/{news_id}/audio/status")
 def update_news_audio_status(news_id: str, request: UpdateAudioStatusRequest) -> dict[str, Any]:

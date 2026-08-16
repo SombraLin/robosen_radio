@@ -8,11 +8,20 @@ export function isRadioAiApiEnabled(): boolean {
   return true;
 }
 
+export function getStoredAuthToken(): string | null {
+  return localStorage.getItem('radio_ai_admin_token');
+}
+
 export async function requestJson<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
   const headers = new Headers(options.headers);
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
+  }
+
+  const token = getStoredAuthToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
   const response = await fetch(url, {
@@ -44,9 +53,16 @@ export async function uploadFile<T>(
   formData.append(fieldName, file);
 
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const headers: HeadersInit = {};
+  const token = getStoredAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     body: formData,
+    headers,
     credentials: 'include',
   });
 

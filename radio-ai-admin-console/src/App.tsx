@@ -6,6 +6,7 @@ import { useDollActions } from './features/dolls/hooks';
 import { useNewsActions } from './features/news-console/hooks';
 import { useAudioAssetActions } from './features/audio-assets/hooks';
 import { useApiKeyStore } from './shared/store/useApiKeyStore';
+import { useAuthStore } from './shared/store/useAuthStore';
 
 // Global Modals
 import { DollEditorModal } from './components/modals/DollEditorModal';
@@ -15,6 +16,7 @@ import { ChainPreviewModal } from './components/modals/ChainPreviewModal';
 import { AudioEditorModal } from './components/modals/AudioEditorModal';
 import { AssignToChannelModal } from './components/modals/AssignToChannelModal';
 import { ApiKeySettingsModal } from './components/modals/ApiKeySettingsModal';
+import { LoginModal } from './components/modals/LoginModal';
 
 function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/dashboard')) return '系统运行状态概览';
@@ -41,14 +43,16 @@ export const App: React.FC = () => {
   const { loadNews } = useNewsActions();
   const { loadAudioAssets } = useAudioAssetActions();
   const loadApiKeyConfig = useApiKeyStore((s) => s.loadFromStorageAndApi);
+  const checkAuth = useAuthStore((s) => s.checkAuth);
 
   useEffect(() => {
     // Initial data hydration from backend APIs
+    checkAuth();
     loadDolls();
     loadNews();
     loadAudioAssets();
     loadApiKeyConfig();
-  }, [loadDolls, loadNews, loadAudioAssets, loadApiKeyConfig]);
+  }, [checkAuth, loadDolls, loadNews, loadAudioAssets, loadApiKeyConfig]);
 
   const pageTitle = getPageTitle(location.pathname);
 
@@ -82,6 +86,7 @@ export const App: React.FC = () => {
       <AudioEditorModal />
       <AssignToChannelModal />
       <ApiKeySettingsModal />
+      <LoginModal />
     </div>
   );
 };
