@@ -1,0 +1,21 @@
+{
+  "name": "@radio-ai/shared-spec",
+  "version": "1.0.0",
+  "description": "RADIO AI 玩偶互动频道平台 共享类型声明与协议规范",
+  "main": "types/index.ts",
+  "types": "types/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "radio-ai",
+    "types",
+    "spec",
+    "protocol"
+  ],
+  "author": "SombraLin / Radio-AI Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

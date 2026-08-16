@@ -1,0 +1,86 @@
+# ==========================================
+# Radio AI Project .gitignore
+# ==========================================
+
+# 1. API Keys, Secrets & Environment Configs
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.secret
+*.credentials
+*apikey*
+*api_key*
+*.token
+token.json
+credentials.json
+
+# 2. Audio Files & Binary Media (音频与多媒体文件)
+*.mp3
+*.wav
+*.aac
+*.flac
+*.m4a
+*.ogg
+*.opus
+*.wma
+*.pcm
+**/data/audio/**
+!**/data/audio/**/playlist_resource.json
+**/output_audio/**
+**/audio_cache/**
+
+# 3. Database & Runtime SQLite Data (数据库与运行时数据)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+**/radio-ai-data/data/*.db
+
+# 4. Logs & Process Outputs (日志文件)
+logs/
+*.log
+*.pid
+nohup.out
+
+# 5. Python Environment & Build Artifacts (Python 环境与构建产物)
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.installed.cfg
+develop-eggs/
+eggs/
+parts/
+bin/
+var/
+sdist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 6. Node.js & Frontend Build Artifacts (Node 模块与前端产物)
+node_modules/
+**/radio-ai-admin-console/dist/
+**/radio-ai-admin-console/node_modules/
+.eslintcache
+.parcel-cache
+.vite/
+
+# 7. IDE & OS Temporary Files (IDE 与系统缓存)
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
