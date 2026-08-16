@@ -31,6 +31,13 @@ export async function requestJson<T>(endpoint: string, options: RequestInit = {}
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('radio_ai_admin_token');
+      localStorage.removeItem('radio_ai_admin_user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     let message = `${response.status} ${response.statusText}`;
     try {
       const errorJson = await response.json();

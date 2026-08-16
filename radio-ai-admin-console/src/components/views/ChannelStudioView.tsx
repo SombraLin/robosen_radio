@@ -5,6 +5,7 @@ import { generateDollPersona, generateAiNodeScriptApi } from '../../services/gem
 import { speakTextWithPersona } from '../../utils/audioSynth';
 import { PRESET_DOLL_IDS, INITIAL_NEWS_CLIPS, INITIAL_AUDIO_ASSETS } from '../../data/mockData';
 import { getAdminNews, isRadioAiApiEnabled, getDollsApi, saveDollApi, deleteDollApi, saveChannelApi, deleteChannelApi, getAudioAssetsApi, freezeChannelApi, runNewsPipeline } from '../../api/newsCenter';
+import { requestJson } from '../../shared/api/client';
 import { useDollStore } from '../../features/dolls/store';
 import { useDollActions } from '../../features/dolls/hooks';
 import { useAudioAssetStore } from '../../features/audio-assets/store';
@@ -754,17 +755,14 @@ export const ChannelStudioView: React.FC<ChannelStudioViewProps> = ({
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/radio-ai/tts/preview`, {
+      const data = await requestJson<{ audio_url?: string; duration?: number }>('/api/v1/radio-ai/tts/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voice_id: voiceId, tts_provider: effectiveTtsProvider }),
       });
-      if (!response.ok) throw new Error('TTS Fetch Failed');
       
       // If user stopped playback during fetch, abort.
       if (playbackSessionRef.current !== currentSession) return;
 
-      const data = await response.json();
       if (!data.audio_url) throw new Error('No audio URL returned');
 
       // Persist the generated audio URL back to the playlist node so it won't regenerate next time.

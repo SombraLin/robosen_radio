@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ExecutionLog } from '../../types';
-
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
+import { requestJson } from '../../shared/api/client';
 
 interface LogsViewProps {
   initialLogs?: ExecutionLog[];
@@ -32,22 +31,19 @@ export const LogsView: React.FC<LogsViewProps> = ({ initialLogs = [] }) => {
         params.append('keyword', searchQuery.trim());
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/v1/admin/logs?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.items)) {
-          const fetchedLogs: ExecutionLog[] = data.items.map((item: any) => ({
-            id: item.id || `log-${Math.random()}`,
-            timestamp: item.timestamp || new Date().toLocaleTimeString(),
-            category: item.source === 'backend' ? '后端API' : item.source === 'tts' ? 'TTS引擎' : item.source === 'crawler' ? '爬虫服务' : '前端UI',
-            level: item.level || 'info',
-            source: item.source || 'backend',
-            text: item.text || '',
-            details: item.text || '',
-            status: item.level === 'error' ? '失败' : item.level === 'success' ? '成功' : '处理中',
-          }));
-          setLogs(fetchedLogs);
-        }
+      const data = await requestJson<{ items?: any[]; total?: number }>(`/api/v1/admin/logs?${params.toString()}`);
+      if (data && Array.isArray(data.items)) {
+        const fetchedLogs: ExecutionLog[] = data.items.map((item: any) => ({
+          id: item.id || `log-${Math.random()}`,
+          timestamp: item.timestamp || new Date().toLocaleTimeString(),
+          category: item.source === 'backend' ? '后端API' : item.source === 'tts' ? 'TTS引擎' : item.source === 'crawler' ? '爬虫服务' : '前端UI',
+          level: item.level || 'info',
+          source: item.source || 'backend',
+          text: item.text || '',
+          details: item.text || '',
+          status: item.level === 'error' ? '失败' : item.level === 'success' ? '成功' : '处理中',
+        }));
+        setLogs(fetchedLogs);
       }
     } catch (e) {
       console.error('拉取实时日志异常:', e);

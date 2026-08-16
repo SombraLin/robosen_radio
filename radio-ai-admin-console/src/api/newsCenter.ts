@@ -121,6 +121,13 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: 'include',
   });
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('radio_ai_admin_token');
+      localStorage.removeItem('radio_ai_admin_user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     let message = `${response.status} ${response.statusText}`;
     try {
       const payload = await response.json() as { message?: string; detail?: string };

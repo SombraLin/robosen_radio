@@ -1,5 +1,6 @@
 import { NewsCategory, NewsClip } from '../types';
 import { isRadioAiApiEnabled } from '../api/newsCenter';
+import { requestJson } from '../shared/api/client';
 
 interface NewsDraftResponse {
   title: string;
@@ -13,17 +14,11 @@ interface ChannelCopyResponse {
   outro: string;
 }
 
-const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-
 async function postDraft<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  return requestJson<T>(path, {
     method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  return response.json() as Promise<T>;
 }
 
 function formatDuration(seconds: number): string {

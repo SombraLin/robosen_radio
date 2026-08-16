@@ -6,28 +6,24 @@ interface AuthState {
   username: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  isLoginModalOpen: boolean;
+  isCheckingAuth: boolean;
   error: string | null;
   
   // Actions
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<boolean>;
-  openLoginModal: () => void;
-  closeLoginModal: () => void;
   setError: (err: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem('radio_ai_admin_token'),
-  username: localStorage.getItem('radio_ai_admin_user') || (localStorage.getItem('radio_ai_admin_token') ? 'admin' : null),
+  username: localStorage.getItem('radio_ai_admin_user'),
   isAuthenticated: Boolean(localStorage.getItem('radio_ai_admin_token')),
   isLoading: false,
-  isLoginModalOpen: false,
+  isCheckingAuth: true,
   error: null,
 
-  openLoginModal: () => set({ isLoginModalOpen: true, error: null }),
-  closeLoginModal: () => set({ isLoginModalOpen: false, error: null }),
   setError: (error: string | null) => set({ error }),
 
   login: async (username: string, password: string): Promise<boolean> => {
@@ -61,7 +57,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         username: data.username,
         isAuthenticated: true,
         isLoading: false,
-        isLoginModalOpen: false,
+        isCheckingAuth: false,
         error: null,
       });
       return true;
@@ -86,20 +82,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       token: null,
       username: null,
       isAuthenticated: false,
-      isLoginModalOpen: false,
+      isCheckingAuth: false,
       error: null,
     });
   },
 
   checkAuth: async (): Promise<boolean> => {
-    const token = get().token || localStorage.getItem('radio_ai_admin_token');
+    const token = localStorage.getItem('radio_ai_admin_token');
+    if (!token) {
+      set({
+        token: null,
+        username: null,
+        isAuthenticated: false,
+        isCheckingAuth: false,
+      });
+      return false;
+    }
+
     try {
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/auth/me`, {
-        headers,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         credentials: 'include',
       });
 
@@ -107,20 +111,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const data = await res.json();
         const user = data.user;
         const name = user?.username || 'admin';
-        set({ isAuthenticated: true, username: name });
+        set({
+          token,
+          username: name,
+          isAuthenticated: true,
+          isCheckingAuth: false,
+        });
         localStorage.setItem('radio_ai_admin_user', name);
         return true;
       } else {
-        // If expired or invalid
-        if (token) {
-          localStorage.removeItem('radio_ai_admin_token');
-          localStorage.removeItem('radio_ai_admin_user');
-          set({ token: null, username: null, isAuthenticated: false });
-        }
+        localStorage.removeItem('radio_ai_admin_token');
+        localStorage.removeItem('radio_ai_admin_user');
+        set({
+          token: null,
+          username: null,
+          isAuthenticated: false,
+          isCheckingAuth: false,
+        });
         return false;
       }
     } catch {
-      return Boolean(get().token);
+      // Network error, if token exists keep checking state false
+      localStorage.removeItem('radio_ai_admin_token');
+      localStorage.removeItem('radio_ai_admin_user');
+      set({
+        token: null,
+        username: null,
+        isAuthenticated: false,
+        isCheckingAuth: false,
+      });
+      return false;
     }
   },
 }));

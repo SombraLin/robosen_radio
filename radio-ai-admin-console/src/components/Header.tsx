@@ -74,6 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
   const handleLogout = async () => {
     setIsUserMenuOpen(false);
     await logout();
+    navigate('/login');
   };
 
   return (

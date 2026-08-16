@@ -400,11 +400,13 @@ def get_system_logs(
     log_files = {
         "backend": logs_dir / "backend.log",
         "tts": logs_dir / "tts_api.log",
+        "tts_worker": logs_dir / "tts_worker.log",
         "crawler": logs_dir / "crawler_worker.log",
+        "frontend": logs_dir / "frontend.log",
     }
 
     items = []
-    sources_to_read = [source] if source in log_files else ["backend", "tts", "crawler"]
+    sources_to_read = [source] if source in log_files else list(log_files.keys())
 
     for src in sources_to_read:
         file_path = log_files.get(src)

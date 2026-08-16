@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getGenerativeConfigApi, updateGenerativeConfigApi, GenerativeConfigDto } from '../../api/newsCenter';
+import { requestJson } from '../../shared/api/client';
 import { LLM_MODEL_OPTIONS, TTS_PROVIDER_OPTIONS, VOICE_OPTIONS } from '../../data/voiceRegistry';
 import { useApiKeyStore } from '../../shared/store/useApiKeyStore';
 
@@ -89,17 +90,15 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({ apiKey: propsApiKey,
 
     setAuditioningVoice(voiceKey);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/radio-ai/tts/preview`, {
+      const data = await requestJson<{ audio_url?: string }>('/api/v1/radio-ai/tts/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
           voice_id: voiceId,
           tts_provider: currentTtsProvider,
         }),
       });
-      if (!response.ok) throw new Error('TTS Preview Failed');
-      const data = await response.json();
+      if (!data.audio_url) throw new Error('TTS Preview Failed');
 
       const audioUrl = `${API_BASE_URL}${data.audio_url}`;
       const audio = new Audio(audioUrl);

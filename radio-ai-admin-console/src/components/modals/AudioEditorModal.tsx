@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AudioAssetItem, AudioCategory, AudioType } from '../../types';
 import { playSynthPreset, stopCurrentSynth } from '../../utils/audioSynth';
 import { uploadAudioAssetApi, isRadioAiApiEnabled } from '../../api/newsCenter';
+import { requestJson } from '../../shared/api/client';
 import { useAudioAssetStore } from '../../features/audio-assets/store';
 import { useAudioAssetActions } from '../../features/audio-assets/hooks';
 
@@ -183,22 +184,19 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
     }
     setIsGenerating(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/radio-ai/tts/preview`, {
+      const data = await requestJson<{ audio_url?: string; duration_seconds?: number; duration?: number }>('/api/v1/radio-ai/tts/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: sourceText,
           voice_id: voiceId,
           tts_provider: ttsProvider,
         }),
       });
-      if (!response.ok) throw new Error('合成失败');
-      const data = await response.json();
       if (data.audio_url) {
         setUrl(`${API_BASE_URL}${data.audio_url}`);
       }
-      if (data.duration_seconds) {
-        setDetectedDuration(data.duration_seconds);
+      if (data.duration_seconds || data.duration) {
+        setDetectedDuration(data.duration_seconds || data.duration || null);
       }
       if (!title.trim()) {
         const autoTitle = `【${channelCategory}】${sourceText.slice(0, 15)}...`;
