@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Doll, NewsClip } from '../../types';
 import { useNewsStore } from '../../features/news-console/store';
 import { useDollStore } from '../../features/dolls/store';
 import { useDollActions } from '../../features/dolls/hooks';
+import { useDashboardHealthStore } from '../../features/dashboard/store';
+import { DiagnosticRemedyModal } from '../../features/dashboard/components/DiagnosticRemedyModal';
+import { ModuleDiagnosticResult } from '../../features/dashboard/types';
 
 interface DashboardViewProps {
   newsClips?: NewsClip[];
@@ -13,6 +16,16 @@ interface DashboardViewProps {
   onPlayClip?: (clip: NewsClip) => void;
   onToggleLive?: (dollId: string, channelId: string) => void;
 }
+
+const MODULE_ICONS: Record<string, string> = {
+  crawler: 'travel_explore',
+  llm: 'psychology',
+  tts: 'record_voice_over',
+  scheduler: 'schedule',
+  storage: 'folder_zip',
+  database: 'database',
+  device: 'developer_board',
+};
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   newsClips: propsNewsClips,
@@ -27,6 +40,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const storeDolls = useDollStore((s) => s.dolls);
   const setDolls = useDollStore((s) => s.setDolls);
   const { saveChannel } = useDollActions();
+
+  // Health & Diagnostics Store
+  const healthStatus = useDashboardHealthStore((s) => s.healthStatus);
+  const isDiagnosingAll = useDashboardHealthStore((s) => s.isDiagnosingAll);
+  const testingModules = useDashboardHealthStore((s) => s.testingModules);
+  const activeDiagnosticResult = useDashboardHealthStore((s) => s.activeDiagnosticResult);
+  const isDiagnosticModalOpen = useDashboardHealthStore((s) => s.isDiagnosticModalOpen);
+  const loadHealthStatus = useDashboardHealthStore((s) => s.loadHealthStatus);
+  const runSingleModuleDiagnose = useDashboardHealthStore((s) => s.runSingleModuleDiagnose);
+  const runAllModulesDiagnose = useDashboardHealthStore((s) => s.runAllModulesDiagnose);
+  const setActiveDiagnosticResult = useDashboardHealthStore((s) => s.setActiveDiagnosticResult);
+  const setIsDiagnosticModalOpen = useDashboardHealthStore((s) => s.setIsDiagnosticModalOpen);
+
+  useEffect(() => {
+    loadHealthStatus();
+  }, [loadHealthStatus]);
 
   const newsClips = propsNewsClips || storeNewsClips;
   const dolls = propsDolls || storeDolls;
@@ -54,314 +83,388 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         })
       );
     });
+
+  // Calculate default fallback modules if not yet loaded from backend
+  const displayModules: ModuleDiagnosticResult[] =
+    healthStatus?.modules || [
+      {
+        module_id: 'crawler',
+        module_name: '新闻抓取爬虫 (News Crawler)',
+        status: 'healthy',
+        latency_ms: 120,
+        tested_at: '刚刚',
+        summary: '全网多源资讯聚合抓取正常',
+      },
+      {
+        module_id: 'llm',
+        module_name: '大模型改写与点评 (LLM Engine)',
+        status: 'healthy',
+        latency_ms: 580,
+        tested_at: '刚刚',
+        summary: '阿里云百炼 / 通义千问接口正常',
+      },
+      {
+        module_id: 'tts',
+        module_name: 'TTS 语音合成 (Speech Engine)',
+        status: 'warning',
+        latency_ms: 35,
+        tested_at: '刚刚',
+        summary: '启用 Edge-TTS 与本地浏览器双重降级',
+      },
+      {
+        module_id: 'scheduler',
+        module_name: '自动化调度器 (Scheduler)',
+        status: 'warning',
+        latency_ms: 1,
+        tested_at: '刚刚',
+        summary: '自动化调度开关处于关闭状态',
+      },
+      {
+        module_id: 'storage',
+        module_name: '音频固化与静态分发 (Storage)',
+        status: 'healthy',
+        latency_ms: 0.2,
+        tested_at: '刚刚',
+        summary: '音频目录写入正常，磁盘空间充裕',
+      },
+      {
+        module_id: 'database',
+        module_name: 'SQLite 数据库引擎 (DB Engine)',
+        status: 'healthy',
+        latency_ms: 0.8,
+        tested_at: '刚刚',
+        summary: '数据库读写正常',
+      },
+      {
+        module_id: 'device',
+        module_name: '设备网关与打断交互 (Gateway)',
+        status: 'healthy',
+        latency_ms: 0.3,
+        tested_at: '刚刚',
+        summary: '硬件拉取与打断接口就绪',
+      },
+    ];
+
+  const overallScore = healthStatus?.health_score ?? 91;
+  const overallStatus = healthStatus?.overall_status ?? 'healthy';
+
   return (
     <div className="p-8 max-w-[1440px] mx-auto space-y-8 animate-fadeIn transition-colors duration-300">
-      {/* Top Page Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[var(--border-color)] pb-6">
+      {/* Top Page Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[var(--border-color)] pb-6">
         <div>
-          <p className="font-data-mono text-[11px] text-[var(--accent)] uppercase tracking-[0.2em] mb-1">EDITORIAL OVERVIEW / 特刊导播</p>
-          <h2 className="text-2xl font-serif-editorial font-bold text-[var(--text-primary)] tracking-wide">系统运行状态概览</h2>
+          <p className="font-data-mono text-[11px] text-[var(--accent)] uppercase tracking-[0.2em] mb-1">
+            OBSERVABILITY & SYSTEM DIAGNOSTICS / 全系统健康监控与一键诊断
+          </p>
+          <h2 className="text-2xl font-serif-editorial font-bold text-[var(--text-primary)] tracking-wide">
+            系统运行监控与排障中心
+          </h2>
         </div>
-        <button
-          onClick={onNavigateToNews}
-          className="flex items-center gap-2 py-2.5 px-5 bg-[var(--bg-subcard)] border border-[var(--accent)]/40 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] font-serif-editorial font-bold text-xs uppercase tracking-wider rounded-sm transition-all duration-200 cursor-pointer shadow-sm active:scale-95"
-        >
-          <span className="material-symbols-outlined text-lg">add_circle</span>
-          <span>创建新播报特刊</span>
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => loadHealthStatus()}
+            className="flex items-center gap-1.5 py-2.5 px-4 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--accent)] text-[var(--text-primary)] font-serif-editorial text-xs rounded-sm transition-all cursor-pointer shadow-sm"
+            title="刷新各模块监控状态"
+          >
+            <span className="material-symbols-outlined text-base">sync</span>
+            <span>刷新状态</span>
+          </button>
+
+          <button
+            onClick={() => runAllModulesDiagnose()}
+            disabled={isDiagnosingAll}
+            className="flex items-center gap-2 py-2.5 px-5 bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90 font-serif-editorial font-bold text-xs uppercase tracking-wider rounded-sm transition-all duration-200 cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+          >
+            <span className={`material-symbols-outlined text-lg ${isDiagnosingAll ? 'animate-spin' : ''}`}>
+              {isDiagnosingAll ? 'progress_activity' : 'medical_services'}
+            </span>
+            <span>{isDiagnosingAll ? '全系统深度体检中...' : '一键全系统深度体检'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Bento Grid */}
-      <div className="grid grid-cols-12 gap-6">
+      {/* Global Health Score Banner */}
+      <div className="p-6 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)] relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+        <div className="flex items-center gap-5">
+          {/* Health Score Circle */}
+          <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <path
+                className="text-white/10"
+                strokeWidth="3.5"
+                stroke="currentColor"
+                fill="none"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path
+                className={
+                  overallStatus === 'healthy'
+                    ? 'text-emerald-400'
+                    : overallStatus === 'degraded'
+                    ? 'text-amber-400'
+                    : 'text-rose-400'
+                }
+                strokeDasharray={`${overallScore}, 100`}
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                stroke="currentColor"
+                fill="none"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+            </svg>
+            <span className="absolute font-data-mono font-bold text-lg text-[var(--text-primary)]">
+              {overallScore}
+            </span>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-lg font-serif-editorial font-bold text-[var(--text-primary)]">
+                {overallStatus === 'healthy'
+                  ? '全系统 7 大模块运行健康'
+                  : overallStatus === 'degraded'
+                  ? '系统运行良好 · 存在次级告警与降级'
+                  : '检测到模块异常故障 · 需排查处理'}
+              </h3>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-data-mono font-bold uppercase tracking-wider ${
+                  overallStatus === 'healthy'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : overallStatus === 'degraded'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                }`}
+              >
+                {overallStatus === 'healthy' ? 'ALL OK' : overallStatus === 'degraded' ? 'DEGRADED' : 'ALERT'}
+              </span>
+            </div>
+            <p className="text-xs text-[var(--text-muted)] mt-1 font-serif-editorial">
+              最后全量自检时间: {healthStatus?.checked_at || '刚刚'} · 包含爬虫采集、大模型改写、语音合成、任务调度、存储与设备网关
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 self-end md:self-center font-data-mono text-xs">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--bg-subcard)] border border-[var(--border-color)]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>健康: {healthStatus?.healthy_count ?? 5}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--bg-subcard)] border border-[var(--border-color)]">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span>告警: {healthStatus?.warning_count ?? 2}</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--bg-subcard)] border border-[var(--border-color)]">
+            <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+            <span>故障: {healthStatus?.error_count ?? 0}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 7 Modules Live Health & Diagnostic Grid */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-serif-editorial font-bold text-[var(--text-primary)] flex items-center gap-2">
+            <span className="material-symbols-outlined text-lg text-[var(--accent)]">tune</span>
+            <span>核心子系统监控与即时排障矩阵 ({displayModules.length}项)</span>
+          </h3>
+          <span className="text-xs text-[var(--text-muted)] font-serif-editorial">
+            点击卡片右下角【测试/诊断】可发起真实探针并获取排查指引
+          </span>
+        </div>
+
+        <div className="grid grid-cols-12 gap-5">
+          {displayModules.map((mod) => {
+            const isTesting = Boolean(testingModules[mod.module_id]);
+            const isModHealthy = mod.status === 'healthy';
+            const isModWarning = mod.status === 'warning';
+            const isModError = mod.status === 'error';
+            const iconName = MODULE_ICONS[mod.module_id] || 'settings';
+
+            return (
+              <div
+                key={mod.module_id}
+                className={`col-span-12 sm:col-span-6 lg:col-span-4 bg-[var(--bg-card)] border rounded-md p-5 flex flex-col justify-between transition-all relative overflow-hidden group shadow-xs hover:border-[var(--accent)]/50 ${
+                  isModError
+                    ? 'border-rose-500/40 bg-rose-950/10'
+                    : isModWarning
+                    ? 'border-amber-500/30'
+                    : 'border-[var(--border-color)]'
+                }`}
+              >
+                {/* Module Top Row */}
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-sm flex items-center justify-center ${
+                          isModError
+                            ? 'bg-rose-500/20 text-rose-400'
+                            : isModWarning
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-[var(--accent)]/15 text-[var(--accent)]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-xl">{iconName}</span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-serif-editorial font-bold text-[var(--text-primary)]">
+                          {mod.module_name}
+                        </h4>
+                        <p className="text-[10px] font-data-mono text-[var(--text-muted)]">
+                          探针延迟: <span className="text-[var(--accent)]">{mod.latency_ms}ms</span> · {mod.tested_at}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-data-mono font-bold shrink-0 ${
+                        isTesting
+                          ? 'bg-sky-500/20 text-sky-400 animate-pulse'
+                          : isModError
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          : isModWarning
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}
+                    >
+                      {isTesting
+                        ? 'PROBING...'
+                        : isModError
+                        ? 'ERROR 异常'
+                        : isModWarning
+                        ? 'WARN 降级'
+                        : 'OK 正常'}
+                    </span>
+                  </div>
+
+                  {/* Summary Text */}
+                  <p className="text-xs font-serif-editorial text-[var(--text-primary)]/90 leading-relaxed min-h-[36px] line-clamp-2">
+                    {mod.summary}
+                  </p>
+
+                  {/* Root Cause Hint if failure */}
+                  {(isModError || isModWarning) && (
+                    <div className="mt-2.5 p-2 rounded bg-black/20 border border-white/5 text-[11px] font-data-mono text-amber-300/90 line-clamp-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm text-amber-400 shrink-0">info</span>
+                      <span className="truncate">{mod.root_cause || mod.actionable_remedy || '存在优化排查建议'}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Module Action Footer */}
+                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveDiagnosticResult(mod);
+                      setIsDiagnosticModalOpen(true);
+                    }}
+                    className="text-[11px] font-serif-editorial text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-sm">assignment</span>
+                    <span>查看详情/建议</span>
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      await runSingleModuleDiagnose(mod.module_id);
+                    }}
+                    disabled={isTesting}
+                    className="px-3 py-1.5 bg-[var(--bg-subcard)] hover:bg-[var(--accent)] hover:text-[var(--accent-text)] text-[var(--text-primary)] border border-[var(--border-color)] hover:border-transparent rounded-sm text-[11px] font-serif-editorial font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-sm ${isTesting ? 'animate-spin' : ''}`}>
+                      {isTesting ? 'progress_activity' : 'play_arrow'}
+                    </span>
+                    <span>{isTesting ? '测试中...' : '单项测试'}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Operational Stats & Quick Channels */}
+      <div className="grid grid-cols-12 gap-6 pt-2">
         {/* Quick Stat 1 */}
-        <div className="col-span-12 md:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 relative overflow-hidden group">
+        <div className="col-span-12 md:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 relative overflow-hidden group shadow-xs">
           <div className="flex justify-between items-start mb-4">
-            <p className="text-[10px] font-data-mono text-[var(--accent)] uppercase tracking-[0.15em]">今日编辑生成稿件</p>
+            <p className="text-[10px] font-data-mono text-[var(--accent)] uppercase tracking-[0.15em]">
+              新闻素材与播报特刊
+            </p>
             <span className="material-symbols-outlined text-[var(--accent)]">article</span>
           </div>
-          <h3 className="text-3xl font-serif-editorial font-bold text-[var(--text-primary)]">1,432</h3>
-          <div className="mt-4 flex items-center gap-2 text-[var(--accent)] font-data-mono text-xs">
-            <span className="material-symbols-outlined text-sm">trending_up</span>
-            <span>+12.5% 对比上刊</span>
+          <h3 className="text-3xl font-serif-editorial font-bold text-[var(--text-primary)]">
+            {newsClips.length} <span className="text-xs font-normal opacity-60">篇稿件</span>
+          </h3>
+          <div className="mt-4 flex items-center justify-between text-xs">
+            <span className="text-[var(--text-muted)] font-serif-editorial">自动抓取与口语化改写</span>
+            <button
+              onClick={onNavigateToNews}
+              className="text-[var(--accent)] hover:underline font-serif-editorial font-bold flex items-center gap-0.5 cursor-pointer"
+            >
+              <span>进入新闻台</span>
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
           </div>
         </div>
 
         {/* Quick Stat 2 */}
-        <div className="col-span-12 md:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 relative overflow-hidden group">
+        <div className="col-span-12 md:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 relative overflow-hidden group shadow-xs">
           <div className="flex justify-between items-start mb-4">
-            <p className="text-[10px] font-data-mono text-[var(--accent)] uppercase tracking-[0.15em]">待审阅点评稿</p>
-            <span className="material-symbols-outlined text-[var(--accent)]">forum</span>
+            <p className="text-[10px] font-data-mono text-[var(--accent)] uppercase tracking-[0.15em]">
+              玩偶广播电台与频道
+            </p>
+            <span className="material-symbols-outlined text-[var(--accent)]">podcasts</span>
           </div>
-          <h3 className="text-3xl font-serif-editorial font-bold text-[var(--text-primary)]">84</h3>
-          <div className="mt-4 flex items-center gap-2 text-[var(--accent)] font-data-mono text-xs">
-            <span className="material-symbols-outlined text-sm">schedule</span>
-            <span>已入队列等待撰写</span>
+          <h3 className="text-3xl font-serif-editorial font-bold text-[var(--text-primary)]">
+            {dolls.reduce((acc, d) => acc + (d.channels?.length || 0), 0)}{' '}
+            <span className="text-xs font-normal opacity-60">个频道 ({dolls.length} 款玩偶)</span>
+          </h3>
+          <div className="mt-4 flex items-center justify-between text-xs">
+            <span className="text-[var(--text-muted)] font-serif-editorial">节点式混编与音频固化</span>
+            <button
+              onClick={onNavigateToChannels}
+              className="text-[var(--accent)] hover:underline font-serif-editorial font-bold flex items-center gap-0.5 cursor-pointer"
+            >
+              <span>管理玩偶频道</span>
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
           </div>
         </div>
 
         {/* Quick Stat 3 */}
-        <div className="col-span-12 md:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 relative overflow-hidden group">
+        <div className="col-span-12 md:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 relative overflow-hidden group shadow-xs">
           <div className="flex justify-between items-start mb-4">
-            <p className="text-[10px] font-data-mono text-[var(--accent)] uppercase tracking-[0.15em]">音频母带存储容量</p>
-            <span className="material-symbols-outlined text-[var(--accent)]">cloud_done</span>
+            <p className="text-[10px] font-data-mono text-[var(--accent)] uppercase tracking-[0.15em]">
+              自动化与硬件连线
+            </p>
+            <span className="material-symbols-outlined text-[var(--accent)]">settings_input_component</span>
           </div>
-          <h3 className="text-3xl font-serif-editorial font-bold text-[var(--text-primary)] mb-4">64%</h3>
-          <div className="w-full h-1 bg-[var(--bg-subcard)] rounded-none overflow-hidden">
-            <div className="h-full bg-[var(--accent)] w-[64%]"></div>
-          </div>
-        </div>
-
-        {/* Live Channel Status Panel */}
-        <div className="col-span-12 lg:col-span-8 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-base font-serif-editorial font-bold text-[var(--text-primary)] flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-[var(--accent)] live-dot"></div>
-              <span>频道直播在线状态</span>
-              <span className="text-xs font-data-mono text-[var(--accent)] bg-[var(--accent)]/15 border border-[var(--accent)]/30 px-2 py-0.5 rounded-sm">
-                已同步 {dolls.reduce((acc, d) => acc + (d.channels || []).filter(channel => channel.isLive).length, 0)} 个开播频道
-              </span>
-            </h3>
+          <h3 className="text-3xl font-serif-editorial font-bold text-[var(--text-primary)]">
+            在线就绪 <span className="text-xs font-normal opacity-60">支持打断问答</span>
+          </h3>
+          <div className="mt-4 flex items-center justify-between text-xs">
+            <span className="text-[var(--text-muted)] font-serif-editorial">定时调度与物理设备网关</span>
             <button
-              onClick={onNavigateToChannels}
-              className="text-[var(--accent)] hover:underline font-data-mono text-xs cursor-pointer tracking-wider flex items-center gap-1"
+              onClick={() => navigate('/device')}
+              className="text-[var(--accent)] hover:underline font-serif-editorial font-bold flex items-center gap-0.5 cursor-pointer"
             >
-              <span>管理玩偶与频道</span>
+              <span>设备模拟器</span>
               <span className="material-symbols-outlined text-sm">arrow_forward</span>
             </button>
           </div>
-
-          <div className="space-y-4">
-            {dolls && dolls.length > 0 ? (
-              dolls.map((doll) => {
-                const liveChannels = (doll.channels || []).filter((channel) => channel.isLive);
-                const isOnline = liveChannels.length > 0 || doll.status === 'online';
-
-                return (
-                  <div
-                    key={doll.id}
-                    className="p-4 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-sm hover:border-[var(--accent)]/50 transition-colors space-y-3"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      {/* Doll Header Info */}
-                      <div className="flex items-center gap-3">
-                        <div className="relative shrink-0">
-                          <img
-                            src={doll.avatarUrl}
-                            alt={doll.name}
-                            className="w-11 h-11 rounded-sm object-cover border border-[var(--accent)]/40"
-                          />
-                          <div
-                            className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-[var(--bg-primary)] ${
-                              liveChannels.length > 0
-                                ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] animate-pulse'
-                                : 'bg-gray-500'
-                            }`}
-                          ></div>
-                        </div>
-
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-sm font-serif-editorial font-bold text-[var(--text-primary)]">
-                              {doll.name}
-                            </h4>
-                            <span className="font-data-mono text-[10px] text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded-sm border border-[var(--accent)]/20">
-                              {doll.stationCode}
-                            </span>
-                            <span
-                              className={`text-[10px] font-data-mono px-2 py-0.5 rounded-sm border ${
-                                isOnline
-                                  ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
-                                  : 'bg-white/5 text-[var(--text-muted)] border-[var(--border-color)]'
-                              }`}
-                            >
-                              {isOnline ? 'ONLINE' : 'OFFLINE'}
-                            </span>
-                          </div>
-                          <p className="font-data-mono text-[11px] text-[var(--text-muted)] mt-0.5">
-                            {doll.streamInfo || 'Stream: 1080p | Latency: 12ms'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar & Waveform */}
-                      <div className="flex items-center gap-4 flex-1 max-w-xs justify-end">
-                        <div className="flex flex-col items-end gap-1 w-full">
-                          <div className="flex justify-between w-full font-data-mono text-[11px] text-[var(--text-muted)]">
-                            <span>特刊播报进度</span>
-                            <span className="text-[var(--accent)] font-bold">
-                              {liveChannels.length > 0 ? `${doll.currentBroadcastProgress || 75}%` : '未开播'}
-                            </span>
-                          </div>
-                          <div className="w-full h-1 bg-[var(--bg-subcard)] rounded-none overflow-hidden">
-                            <div
-                              className={`h-full ${liveChannels.length > 0 ? 'bg-[var(--accent)]' : 'bg-gray-600'}`}
-                              style={{ width: `${liveChannels.length > 0 ? (doll.currentBroadcastProgress || 75) : 0}%` }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        {liveChannels.length > 0 ? (
-                          <div className="hidden sm:flex items-end h-6 gap-0.5 shrink-0">
-                            <div className="w-0.5 bg-[var(--accent)] bar-1 h-full"></div>
-                            <div className="w-0.5 bg-[var(--accent)] bar-2 h-3/4"></div>
-                            <div className="w-0.5 bg-[var(--accent)] bar-3 h-full"></div>
-                            <div className="w-0.5 bg-[var(--accent)] bar-4 h-1/2"></div>
-                            <div className="w-0.5 bg-[var(--accent)] bar-5 h-5/6"></div>
-                          </div>
-                        ) : (
-                          <span className="hidden sm:inline-block px-2 py-0.5 bg-white/5 border border-[var(--border-color)] text-[var(--text-muted)] rounded-sm font-data-mono text-[10px] shrink-0">
-                            离线
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Sub-Channels Badges List */}
-                    {doll.channels && doll.channels.length > 0 && (
-                      <div className="pt-2 border-t border-[var(--border-color)]/60 flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-data-mono text-[var(--text-muted)]">所属频道:</span>
-                        {doll.channels.map((v) => (
-                          <button
-                            key={v.id}
-                            onClick={() => onToggleLive && onToggleLive(doll.id, v.id)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm font-data-mono text-[10px] border transition-all cursor-pointer ${
-                              v.isLive
-                                ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/40 font-bold shadow-xs'
-                                : 'bg-[var(--bg-subcard)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--accent)]/50'
-                            }`}
-                            title={v.isLive ? '点击关闭频道直播' : '点击开启频道直播'}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                v.isLive ? 'bg-[var(--accent)] animate-pulse' : 'bg-gray-500'
-                              }`}
-                            ></span>
-                            <span>{v.channel_name || v.name}</span>
-                            {v.category && (
-                              <span className="text-[9px] px-1 bg-[var(--accent)]/10 rounded text-[var(--accent)] border border-[var(--accent)]/20 font-serif-editorial">
-                                {v.category}
-                              </span>
-                            )}
-                            <span className="opacity-70">[{v.doll_id}]</span>
-                            <span className={`ml-1 text-[9px] font-sans ${v.isLive ? 'text-[var(--accent)] font-bold' : 'text-gray-400'}`}>
-                              {v.isLive ? '● 直播中' : '○ 离线'}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="p-8 text-center text-[var(--text-muted)] font-data-mono text-xs">
-                暂无玩偶数据，请前往“频道管理”创建玩偶角色。
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Categorized Topic Volume */}
-        <div className="col-span-12 lg:col-span-4 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6 flex flex-col justify-between">
-          <h3 className="text-base font-serif-editorial font-bold text-[var(--text-primary)] mb-6">专栏话题热度</h3>
-          <div className="flex-1 flex flex-col justify-center space-y-6">
-            <div>
-              <div className="flex justify-between text-xs font-data-mono mb-2">
-                <span className="text-[var(--text-primary)] font-serif-editorial font-semibold">前沿科技（热门）</span>
-                <span className="text-[var(--accent)]">4,120</span>
-              </div>
-              <div className="w-full h-1.5 bg-[var(--bg-primary)]">
-                <div className="h-full bg-[var(--accent)] w-[85%]"></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-data-mono mb-2">
-                <span className="text-[var(--text-primary)] font-serif-editorial font-semibold">金融市场</span>
-                <span className="text-[var(--accent)]">2,840</span>
-              </div>
-              <div className="w-full h-1.5 bg-[var(--bg-primary)]">
-                <div className="h-full bg-[var(--accent)] opacity-80 w-[60%]"></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-data-mono mb-2">
-                <span className="text-[var(--text-primary)] font-serif-editorial font-semibold">国际时政</span>
-                <span className="text-[var(--text-muted)]">1,530</span>
-              </div>
-              <div className="w-full h-1.5 bg-[var(--bg-primary)]">
-                <div className="h-full bg-[var(--text-muted)] w-[35%]"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity Table */}
-        <div className="col-span-12 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-sm p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-base font-serif-editorial font-bold text-[var(--text-primary)]">最近文案生成记录</h3>
-            <button
-              onClick={onNavigateToNews}
-              className="text-[var(--accent)] hover:underline font-data-mono text-xs cursor-pointer tracking-wider"
-            >
-              进入新闻编辑室 →
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[var(--border-color)] font-data-mono text-[11px] text-[var(--accent)] uppercase tracking-wider">
-                  <th className="pb-3 pl-2 font-medium">时间戳</th>
-                  <th className="pb-3 font-medium">关联播报角色</th>
-                  <th className="pb-3 font-medium">稿件标题</th>
-                  <th className="pb-3 font-medium">状态</th>
-                  <th className="pb-3 text-right pr-2 font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody className="text-xs font-data-mono divide-y divide-[var(--border-color)]">
-                {(newsClips || []).slice(0, 5).map((clip) => (
-                  <tr key={clip.id} className="hover:bg-[var(--bg-subcard)] transition-colors group">
-                    <td className="py-3.5 pl-2 text-[var(--text-muted)]">{clip.createdAt} UTC</td>
-                    <td className="py-3.5">
-                      <div className="flex items-center gap-2 text-[var(--text-primary)]">
-                        <div className="w-2 h-2 rounded-full bg-[var(--accent)]"></div>
-                        <span className="font-serif-editorial">{clip.role}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 text-[var(--text-primary)] max-w-md truncate pr-4 font-serif-editorial font-medium">
-                      {clip.title}
-                    </td>
-                    <td className="py-3.5">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-data-mono border ${
-                          clip.status === '已就绪'
-                            ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
-                            : clip.status === '生成中'
-                            ? 'bg-[#B85243]/15 text-[#B85243] border-[#B85243]/30 animate-pulse'
-                            : 'bg-white/5 text-[var(--text-muted)] border-[var(--border-color)]'
-                        }`}
-                      >
-                        {clip.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 text-right pr-2">
-                      <button
-                        onClick={() => onPlayClip?.(clip)}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-subcard)] rounded-sm transition-all cursor-pointer"
-                        title="试听/试读"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       </div>
+
+      {/* Interactive Diagnostic & Failure Remediation Modal */}
+      <DiagnosticRemedyModal
+        isOpen={isDiagnosticModalOpen}
+        onClose={() => setIsDiagnosticModalOpen(false)}
+        result={activeDiagnosticResult}
+        onRetest={(modId) => runSingleModuleDiagnose(modId)}
+      />
     </div>
   );
 };

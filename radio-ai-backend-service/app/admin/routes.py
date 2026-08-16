@@ -500,3 +500,9 @@ def get_system_logs(
         "total": len(items),
     }
 
+
+# Mount health diagnostic sub-router under /api/v1/admin/health and /api/v1/radio-ai/health
+from app.admin.health import router as health_router
+router.include_router(health_router)
+
+
