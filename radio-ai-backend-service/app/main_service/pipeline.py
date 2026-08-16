@@ -1,5 +1,5 @@
-from __future__ import annotations
-
+import asyncio
+import os
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -87,6 +87,8 @@ async def create_script(
         effective_model = (llm_model or row.get("llm_model") or gen_cfg["default_llm_model"]).strip()
         effective_provider = (llm_provider or gen_cfg["default_llm_provider"]).strip()
 
+        effective_api_key = gen_cfg.get("dashscope_api_key") or os.getenv("DASHSCOPE_API_KEY")
+
         # Send Celery task
         result = celery_app.send_task(
             "crawler.generate_script",
@@ -95,16 +97,20 @@ async def create_script(
                 "title": row["title"],
                 "source": row["source"],
                 "clean_summary": row["clean_summary"] or row["raw_summary"],
-                "published_at": row["published_at"].isoformat() if row["published_at"] else None,
+                "published_at": (
+                    row["published_at"].isoformat()
+                    if hasattr(row["published_at"], "isoformat")
+                    else (str(row["published_at"]) if row["published_at"] else None)
+                ),
                 "custom_prompt": effective_prompt,
                 "llm_model": effective_model,
-                "llm_provider": effective_provider
+                "llm_provider": effective_provider,
+                "api_key": effective_api_key,
             }
         )
         
-        # We wait for the result synchronously because the UI might expect it.
-        # Timeout after 120s
-        task_result = result.get(timeout=120)
+        # We wait for the result asynchronously in threadpool to avoid blocking FastAPI event loop
+        task_result = await asyncio.to_thread(result.get, 60)
         if task_result.get("status") == "error":
             raise RuntimeError(task_result.get("error"))
             
@@ -146,7 +152,7 @@ async def create_audio(
             }
         )
         
-        task_result = result.get(timeout=120)
+        task_result = await asyncio.to_thread(result.get, 60)
         if task_result.get("status") == "error":
             raise RuntimeError(task_result.get("error"))
             

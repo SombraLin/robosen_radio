@@ -10,7 +10,15 @@ SYSTEM_PROMPT = """你是一名专业的新闻播报稿编辑。请把新闻素�
 def get_dashscope_api_key(custom_key: str | None = None) -> str:
     if custom_key and custom_key.strip():
         return custom_key.strip()
-    return (os.getenv("DASHSCOPE_API_KEY") or os.getenv("BAILIAN_API_KEY") or "").strip()
+    env_key = (os.getenv("DASHSCOPE_API_KEY") or os.getenv("BAILIAN_API_KEY") or "").strip()
+    if env_key:
+        return env_key
+    try:
+        from radio_ai_data import get_generative_config
+        cfg = get_generative_config()
+        return (cfg.get("dashscope_api_key") or "").strip()
+    except Exception:
+        return ""
 
 
 async def generate_script(

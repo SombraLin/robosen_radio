@@ -1,5 +1,6 @@
 export type NewsCategory = '科技' | '政治' | '市场' | '文化' | '娱乐';
-export type NewsStatus = '已就绪' | '草稿' | '处理中' | '生成中' | '已归档';
+export type NewsStatus = '已就绪' | '草稿' | '处理中' | '生成中' | '已归档' | '生成失败';
+
 
 export interface NewsClip {
   id: string;

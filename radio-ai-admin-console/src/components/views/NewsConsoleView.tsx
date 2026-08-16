@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NewsClip, BroadcastChainItem, NewsCategory, NewsStatus } from '../../types';
 import { useNewsStore } from '../../features/news-console/store';
 import { useNewsActions } from '../../features/news-console/hooks';
@@ -31,10 +31,15 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
   const setChainItems = useNewsStore((s) => s.setChainItems);
   const setIsPreviewModalOpen = useNewsStore((s) => s.setIsPreviewModalOpen);
   const setIsNewBroadcastOpen = useNewsStore((s) => s.setIsNewBroadcastOpen);
-  const { openNewsDetailById } = useNewsActions();
+  const { openNewsDetailById, loadNews } = useNewsActions();
+  const isLoading = useNewsStore((s) => s.isLoading);
 
   const newsClips = propsNewsClips || storeNewsClips;
   const chainItems = propsChainItems || storeChainItems;
+
+  useEffect(() => {
+    loadNews();
+  }, [loadNews]);
 
   const onAddToChain =
     propsOnAddToChain ||
@@ -74,7 +79,13 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
     propsOnOpenNewBroadcast || (() => setIsNewBroadcastOpen(true));
   const onOpenNews = propsOnOpenNews || openNewsDetailById;
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
-  const [selectedStatuses, setSelectedStatuses] = useState<NewsStatus[]>(['已就绪', '草稿', '处理中', '生成中']);
+  const [selectedStatuses, setSelectedStatuses] = useState<NewsStatus[]>([
+    '已就绪',
+    '草稿',
+    '处理中',
+    '生成中',
+    '生成失败',
+  ]);
 
   // Calculate total seconds in chain
   const totalSeconds = chainItems.reduce((acc, curr) => acc + curr.durationSeconds, 0);
@@ -86,6 +97,14 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
     setSelectedStatuses((prev) =>
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     );
+  };
+
+  const selectAllStatuses = () => {
+    setSelectedStatuses(['已就绪', '草稿', '处理中', '生成中', '生成失败']);
+  };
+
+  const clearStatuses = () => {
+    setSelectedStatuses([]);
   };
 
   const filteredClips = newsClips.filter((clip) => {
@@ -118,6 +137,7 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
                 {['全部', '科技', '政治', '市场', '文化', '娱乐'].map((cat) => (
                   <button
                     key={cat}
+                    id={`filter-cat-${cat}`}
                     onClick={() => setSelectedCategory(cat)}
                     className={`px-3 py-1.5 rounded-sm text-xs font-serif-editorial transition-all cursor-pointer border ${
                       selectedCategory === cat
@@ -133,33 +153,67 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
 
             {/* Status Filter */}
             <div>
-              <label className="font-data-mono text-[11px] text-[var(--accent)] mb-2 block uppercase tracking-[0.15em]">
-                文案生成状态
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="font-data-mono text-[11px] text-[var(--accent)] block uppercase tracking-[0.15em]">
+                  文案生成状态
+                </label>
+                <div className="flex gap-2 text-[10px] font-data-mono">
+                  <button onClick={selectAllStatuses} className="text-[var(--accent)] hover:underline cursor-pointer">全选</button>
+                  <span className="text-[var(--text-muted)]">/</span>
+                  <button onClick={clearStatuses} className="text-[var(--text-muted)] hover:underline cursor-pointer">清空</button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="flex items-center gap-3 p-2 rounded-sm hover:bg-[var(--bg-subcard)] transition-colors cursor-pointer select-none border border-transparent hover:border-[var(--border-color)]">
                   <input
                     type="checkbox"
+                    id="filter-status-ready"
                     checked={selectedStatuses.includes('已就绪')}
                     onChange={() => toggleStatus('已就绪')}
-                    className="rounded-sm border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                    className="rounded-sm border-[var(--border-color)] bg-[var(--bg-primary)] text-emerald-500 focus:ring-emerald-500"
                   />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]"></span>
-                  <span className="font-data-mono text-xs text-[var(--text-primary)]">已就绪审阅</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span className="font-data-mono text-xs text-[var(--text-primary)]">已审阅就绪</span>
                 </label>
 
                 <label className="flex items-center gap-3 p-2 rounded-sm hover:bg-[var(--bg-subcard)] transition-colors cursor-pointer select-none border border-transparent hover:border-[var(--border-color)]">
                   <input
                     type="checkbox"
-                    checked={selectedStatuses.includes('草稿') || selectedStatuses.includes('生成中')}
+                    id="filter-status-generating"
+                    checked={selectedStatuses.includes('生成中') || selectedStatuses.includes('处理中')}
                     onChange={() => {
-                      toggleStatus('草稿');
                       toggleStatus('生成中');
+                      toggleStatus('处理中');
                     }}
-                    className="rounded-sm border-[var(--border-color)] bg-[var(--bg-primary)] text-[#B85243] focus:ring-[#B85243]"
+                    className="rounded-sm border-[var(--border-color)] bg-[var(--bg-primary)] text-amber-500 focus:ring-amber-500"
                   />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#B85243]"></span>
-                  <span className="font-data-mono text-xs text-[var(--text-primary)]">草稿 / 编译中</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <span className="font-data-mono text-xs text-[var(--text-primary)]">AI 编译生成中</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-2 rounded-sm hover:bg-[var(--bg-subcard)] transition-colors cursor-pointer select-none border border-transparent hover:border-[var(--border-color)]">
+                  <input
+                    type="checkbox"
+                    id="filter-status-draft"
+                    checked={selectedStatuses.includes('草稿')}
+                    onChange={() => toggleStatus('草稿')}
+                    className="rounded-sm border-[var(--border-color)] bg-[var(--bg-primary)] text-slate-400 focus:ring-slate-400"
+                  />
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                  <span className="font-data-mono text-xs text-[var(--text-primary)]">草稿 / 待编译</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-2 rounded-sm hover:bg-[var(--bg-subcard)] transition-colors cursor-pointer select-none border border-transparent hover:border-[var(--border-color)]">
+                  <input
+                    type="checkbox"
+                    id="filter-status-failed"
+                    checked={selectedStatuses.includes('生成失败')}
+                    onChange={() => toggleStatus('生成失败')}
+                    className="rounded-sm border-[var(--border-color)] bg-[var(--bg-primary)] text-rose-500 focus:ring-rose-500"
+                  />
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <span className="font-data-mono text-xs text-[var(--text-primary)]">生成失败 / 需重试</span>
                 </label>
               </div>
             </div>
@@ -167,8 +221,9 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-auto pt-4 border-t border-[var(--border-color)]">
+        <div className="mt-auto pt-4 border-t border-[var(--border-color)] flex flex-col gap-2">
           <button
+            id="btn-open-new-broadcast"
             onClick={onOpenNewBroadcast}
             className="w-full py-2.5 bg-[var(--bg-subcard)] hover:opacity-90 border border-[var(--accent)]/40 text-[var(--accent)] rounded-sm text-xs font-serif-editorial font-bold transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
           >
@@ -185,7 +240,21 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
             <span className="material-symbols-outlined text-[var(--accent)]">feed</span>
             <span>可用稿件片段</span>
           </h3>
-          <span className="font-data-mono text-xs text-[var(--accent)]">{filteredClips.length} 篇稿件</span>
+          <div className="flex items-center gap-3">
+            <button
+              id="btn-refresh-news"
+              onClick={() => loadNews()}
+              disabled={isLoading}
+              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent)] cursor-pointer flex items-center gap-1 text-xs font-data-mono disabled:opacity-50"
+              title="刷新新闻列表"
+            >
+              <span className={`material-symbols-outlined text-sm ${isLoading ? 'animate-spin text-[var(--accent)]' : ''}`}>
+                refresh
+              </span>
+              <span>{isLoading ? '刷新中' : '刷新'}</span>
+            </button>
+            <span className="font-data-mono text-xs text-[var(--accent)]">{filteredClips.length} 篇稿件</span>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
@@ -194,6 +263,7 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
             return (
               <div
                 key={clip.id}
+                data-clip-id={clip.id}
                 className="p-4 rounded-sm bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--accent)]/60 transition-all group relative"
               >
                 <div className="flex justify-between items-start mb-2">
@@ -201,18 +271,39 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
                     {clip.category}专栏
                   </span>
                   <div className="flex items-center gap-2">
-                    {clip.status === '已就绪' ? (
-                      <span className="px-2 py-0.5 rounded-sm bg-[var(--accent)]/15 text-[var(--accent)] font-data-mono text-[10px] border border-[var(--accent)]/30 uppercase tracking-wider">
+                    {clip.status === '已就绪' && (
+                      <span className="px-2 py-0.5 rounded-sm bg-emerald-500/15 text-emerald-400 font-data-mono text-[10px] border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">check_circle</span>
                         已审阅
                       </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-sm bg-[#B85243]/15 text-[#B85243] font-data-mono text-[10px] border border-[#B85243]/30 flex items-center gap-1 uppercase tracking-wider">
+                    )}
+                    {clip.status === '生成中' && (
+                      <span className="px-2 py-0.5 rounded-sm bg-amber-500/15 text-amber-400 font-data-mono text-[10px] border border-amber-500/30 flex items-center gap-1 uppercase tracking-wider">
                         <span className="material-symbols-outlined text-xs animate-spin">sync</span>
-                        撰写中
+                        生成中
+                      </span>
+                    )}
+                    {clip.status === '处理中' && (
+                      <span className="px-2 py-0.5 rounded-sm bg-sky-500/15 text-sky-400 font-data-mono text-[10px] border border-sky-500/30 flex items-center gap-1 uppercase tracking-wider">
+                        <span className="material-symbols-outlined text-xs animate-pulse">hourglass_empty</span>
+                        处理中
+                      </span>
+                    )}
+                    {clip.status === '草稿' && (
+                      <span className="px-2 py-0.5 rounded-sm bg-slate-500/15 text-slate-400 font-data-mono text-[10px] border border-slate-500/30 uppercase tracking-wider flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">edit_note</span>
+                        草稿
+                      </span>
+                    )}
+                    {clip.status === '生成失败' && (
+                      <span className="px-2 py-0.5 rounded-sm bg-rose-500/15 text-rose-400 font-data-mono text-[10px] border border-rose-500/30 uppercase tracking-wider flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">error_outline</span>
+                        生成失败
                       </span>
                     )}
 
                     <button
+                      id={`btn-add-chain-${clip.id}`}
                       onClick={() => onAddToChain(clip)}
                       disabled={inChain}
                       className={`px-2.5 py-1 rounded-sm text-xs font-serif-editorial font-bold transition-all flex items-center gap-1 cursor-pointer uppercase ${
@@ -247,8 +338,13 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
                     </span>
                   </div>
                   {onOpenNews && (
-                    <button onClick={() => onOpenNews(clip.id)} className="text-[var(--accent)] hover:underline cursor-pointer">
-                      编辑详情
+                    <button
+                      id={`btn-detail-${clip.id}`}
+                      onClick={() => onOpenNews(clip.id)}
+                      className="text-[var(--accent)] hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-xs">edit_square</span>
+                      <span>编辑详情</span>
                     </button>
                   )}
                 </div>
@@ -263,6 +359,7 @@ export const NewsConsoleView: React.FC<NewsConsoleViewProps> = ({
           )}
         </div>
       </section>
+
 
       {/* Right Panel: Broadcast Chain Builder */}
       <section className="col-span-12 lg:col-span-4 bg-[var(--bg-card)] border border-[var(--accent)]/30 rounded-md flex flex-col overflow-hidden neon-glow">

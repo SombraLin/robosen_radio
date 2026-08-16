@@ -48,12 +48,18 @@ class NewsRepository:
     def audio_dto(row: dict[str, Any]) -> dict[str, Any]:
         audio_path = row.get("audio_path")
         if audio_path:
-            p = Path(audio_path)
-            try:
-                rel = p.relative_to(settings.audio_dir)
-                local_url = f"/static/audio/{rel}"
-            except ValueError:
-                local_url = f"/static/audio/{p.name}"
+            p = Path(audio_path).resolve()
+            parts = p.parts
+            if "audio" in parts:
+                idx = len(parts) - 1 - parts[::-1].index("audio")
+                rel_parts = parts[idx + 1 :]
+                local_url = "/static/audio/" + "/".join(rel_parts)
+            else:
+                try:
+                    rel = p.relative_to(settings.audio_dir)
+                    local_url = f"/static/audio/{rel.as_posix()}"
+                except ValueError:
+                    local_url = f"/static/audio/{p.name}"
         else:
             local_url = None
 

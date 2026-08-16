@@ -37,8 +37,8 @@ export function useNewsActions() {
           draft: '草稿',
           generating: '生成中',
           stale: '处理中',
-          failed: '处理中',
-          interrupted: '处理中',
+          failed: '生成失败',
+          interrupted: '生成失败',
         };
         setNewsClips(
           page.items.map((item) => ({

@@ -43,8 +43,13 @@ pip install -r ./radio-ai-backend-service/requirements.txt
 pip install -r ./radio-ai-tts/requirements.txt
 pip install -e ./radio-ai-crawler
 
-# 4. 创建日志目录
+# 4. 创建日志目录并清理遗留进程
 mkdir -p logs
+echo -e "${YELLOW}清理可能残留的旧服务进程...${NC}"
+pkill -f 'uvicorn app.main:app' 2>/dev/null || true
+pkill -f 'celery -A' 2>/dev/null || true
+pkill -f 'vite' 2>/dev/null || true
+sleep 1
 
 PIDS=()
 
@@ -55,6 +60,8 @@ cleanup() {
             kill -TERM "$pid" 2>/dev/null || true
         fi
     done
+    pkill -f 'uvicorn app.main:app' 2>/dev/null || true
+    pkill -f 'celery -A' 2>/dev/null || true
     exit 0
 }
 

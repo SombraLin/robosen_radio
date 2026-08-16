@@ -1,7 +1,8 @@
 export type ViewTab = 'dashboard' | 'channels' | 'channel-studio' | 'channel-templates' | 'news' | 'automation' | 'audio' | 'device' | 'atlas' | 'trash' | 'ai-config' | 'logs';
 
 export type NewsCategory = '科技' | '政治' | '市场' | '文化' | '娱乐';
-export type NewsStatus = '已就绪' | '草稿' | '处理中' | '生成中' | '已归档';
+export type NewsStatus = '已就绪' | '草稿' | '处理中' | '生成中' | '已归档' | '生成失败';
+
 
 export type ChannelCategory = '新闻频道' | '天气频道' | '电子宠物频道' | '故事频道' | '音乐频道' | '剧场频道' | '学习频道';
 

@@ -5,7 +5,7 @@
   "type": "module",
   "description": "RADIO AI 玩偶互动频道平台 独立 Web 管理控制台前端",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=5173 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"

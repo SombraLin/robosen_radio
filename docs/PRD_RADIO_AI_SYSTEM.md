@@ -5,6 +5,7 @@
 ## 1. 产品概述与背景 (Product Overview & Background)
 
 ### 1.1 产品愿景与第一性原理 (First-Principles & Vision)
+
 传统的桌面玩具/智能硬件通常面临 **“内容静态匮乏、互动模式单一、缺乏情感长效陪伴”** 的痛点。
 **ROBOSEN RADIO AI** 从第一性原理出发，将实体桌面玩偶（如蜡笔小新、草莓熊、樱桃小丸子、胡迪等）转化为 **“具备人设灵魂、时效资讯驱动、支持随听随打断的桌面多模态广播电台”**。
 
@@ -150,19 +151,20 @@ classDef moduleHeader fill:#0F172A,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC
 classDef featureBox fill:#1E293B,stroke:#94A3B8,stroke-width:1px,color:#F1F5F9;
 
 flowchart LR
-    subgraph Modules ["📦 核心功能矩阵 (Feature Modules Matrix)"]
+    subgraph Modules ["核心功能矩阵"]
         direction TB
-        M1["1. 玩偶与频道编排中心\n(Doll & Channel Studio)"]:::moduleHeader
-        M2["2. 新闻自动化调度引擎\n(News & Automation Engine)"]:::moduleHeader
-        M3["3. 声音资产与音色配置\n(Audio Assets & Voice Persona)"]:::moduleHeader
-        M4["4. 硬件网关与打断交互\n(Device Gateway & Interruption)"]:::moduleHeader
-        M5["5. 监控日志与系统支撑\n(Observability & Config)"]:::moduleHeader
+        M1["玩偶与频道编排中心"]:::moduleHeader
+        M2["新闻自动化调度引擎"]:::moduleHeader
+        M3["声音资产与音色配置"]:::moduleHeader
+        M4["硬件网关与打断交互"]:::moduleHeader
+        M5["监控日志与系统支撑"]:::moduleHeader
     end
 ```
 
 ### 3.1 模块一：玩偶人设与频道编排中心 (Doll & Channel Studio)
 
 #### 1. 玩偶人设注册表 (Doll Registry)
+
 - **预设玩偶库**：支持至少 16 款预置玩偶（如草莓熊 Lotso、蜡笔小新系列 A1-A4、樱桃小丸子系列、胡迪 Woody、三眼仔 Alien、巴斯光年 Buzz、瓦力 Walle 等）。
 - **玩偶人设元数据**：
   - `doll_id`（唯一标识，如 `MINI-LOTSO`）
@@ -173,6 +175,7 @@ flowchart LR
   - `avatarUrl`（玩偶专属头像，支持图鉴裁切上传）
 
 #### 2. 节点式频道时间线 (Channel Studio Timeline)
+
 - **多类型节点混编**：
   1. **开场片头 (Intro)**：玩偶专属电台欢迎语及栏目介绍。
   2. **转场音效 (Transition)**：快节奏 Swoosh、音效扫频或 Jingle。
@@ -183,6 +186,7 @@ flowchart LR
 - **节点编辑能力**：支持拖拽排序、单节点试听（Web Speech API / TTS 后端流）、时长自定义、文案实时修改。
 
 #### 3. 频道音频解耦与固化 (Freeze Mechanism)
+
 - **背景**：动态频道中的新闻或点评若依赖外部实时网络，设备端在网络波动时会卡顿。
 - **固化流程**：
   - 点击“解耦并固化”按钮，后端将该频道所有节点的音频文件统一物化复制到 `data/audio/channels/{doll_id}/{channel_id}/node_{item_id}.mp3`。
@@ -190,6 +194,7 @@ flowchart LR
   - 数据库同步更新 `playlist` 字段，标记该频道具备离线独立分发能力。
 
 #### 4. 玩偶动作图鉴 Studio (Doll Atlas Studio)
+
 - 提供 10X 超高清海报漫游与动作裁切器，支持自由比例、1:1、4:3、圆形蒙版裁剪，一键保存并自动绑定至玩偶头像。
 
 ---
@@ -199,7 +204,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     classDef newsStep fill:#1E1B4B,stroke:#6366F1,stroke-width:2px,color:#EEF2FF;
-    
+
     A["🕷️ 全网热点抓取\n(新浪/微博/36Kr/澎湃)"]:::newsStep --> B["🧹 清洗与标签分类\n(科技/财经/国内/国际/娱乐)"]:::newsStep
     B --> C["📝 LLM 提取口语播报稿\n(80-150字 主播语感)"]:::newsStep
     C --> D["🧸 玩偶 Prompt 注入点评\n(50-100字 角色观点)"]:::newsStep
@@ -233,29 +238,30 @@ flowchart LR
 flowchart TD
     classDef devBox fill:#14532D,stroke:#4ADE80,stroke-width:2px,color:#F0FDF4;
     classDef nlpBox fill:#701A75,stroke:#E879F9,stroke-width:2px,color:#FDF4FF;
-    
+
     Dev["🧸 物理玩偶设备\n(ESP32 / Linux / Android)"]:::devBox
-    
+
     subgraph Device_APIs ["网关通讯契约"]
         GetChannels["GET /api/v1/device/dolls/{id}/channels\n获取频道清单与 Manifest"]:::devBox
         PostStatus["POST /api/v1/device/playback/status\n心跳上报当前播放节点与进度"]:::devBox
         PostInterrupt["POST /api/v1/device/playback/interruption-chat\n上传打断问答请求"]:::devBox
     end
-    
+
     Dev -->|1. 开机拉取| GetChannels
     Dev -->|2. 周期心跳| PostStatus
     Dev -->|3. 语音打断| PostInterrupt
-    
+
     subgraph Interrupt_RAG ["🧠 打断上下文应答引擎"]
         ContextInject["获取当前播报节点内容\n+ 玩偶人设 Prompt"]:::nlpBox
         LLMSolve["LLM 针对问题进行角色化回答"]:::nlpBox
         TTSStream["CosyVoice 实时生成语音回复"]:::nlpBox
     end
-    
+
     PostInterrupt --> ContextInject --> LLMSolve --> TTSStream -->|下发音频与文本| Dev
 ```
 
 #### 1. 硬件端通讯协议
+
 - **拉取频道列表**：`GET /api/v1/device/dolls/{doll_id}/channels` 返回当前玩偶已启用的所有频道配置及 `manifest_url`。
 - **播放状态上报**：`POST /api/v1/device/playback/status` 硬件每隔 5~10 秒上报播放器状态（播放中、暂停、当前节点 `current_item_id`、已播秒数 `progress_seconds`）。
 - **打断对话接口**：`POST /api/v1/device/playback/interruption-chat`
@@ -331,24 +337,26 @@ flowchart TD
 ```
 
 #### 1. 监控与诊断业务背景与痛点
+
 在复合式 AI 广播系统中，任一模块（如爬虫被反爬拦截、大模型 API Key 过期、TTS 微服务未启动、磁盘无写入权限、Celery 队列断连）出现异常都会导致业务链路中断。
 传统运维方式需要登录服务器查看 `logs/crawler_worker.log` 或 `logs/tts_worker.log`，门槛高且定位慢。
 **本需求要求在前端仪表盘（`/dashboard`）实现开箱即用的全模块运行监控与一键诊断自检**：
+
 - **实时呈现**：展示各模块的运行状态（`HEALTHY` / `DEGRADED` / `DOWN` / `TESTING`）、响应延迟（ms）、最后一次检查时间及连续失败次数。
 - **一键自检**：提供“全系统一键体检”及“单模块即时测试”按钮，主动发起端到端真实探针测试。
 - **根因分析与排障指引**：当新闻抓取或语音生成失败时，自动提取错误堆栈，生成通俗易懂的根因分析与可点击的一键修复跳转（如快捷打开 API Key 设置弹窗、一键重启自动化调度等）。
 
 #### 2. 七大核心模块诊断探针矩阵 (Diagnostic Probes Matrix)
 
-| 模块名称 | 探针测试逻辑 (Active Probe Logic) | 常见故障场景 (Failure Scenarios) | 智能排查修复建议 (Actionable Remedy) |
-| :--- | :--- | :--- | :--- |
-| **1. 新闻抓取爬虫 (News Crawler)** | 模拟向上游资讯源（Zaker/Sina）发起微型实时 HTTP 请求，检测状态码、解析耗时与提取条数；检测 Redis / Celery `crawler_queue` 连通性 | 上游接口 403/429 反爬、网络 DNS 解析超时、Celery Worker 未启动 | 提示上游接口拦截情况；建议调整爬虫间隔或检查 `crawler_worker.log`；提供一键重试抓取 |
-| **2. 大模型生成 (LLM Engine)** | 向 DashScope / Gemini 发送 1-Token 测试改写 Prompt，校验 API Key 鉴权、配额余额与接口往返延迟 (RTT) | API Key 无效/欠费、Token 限流、网络代理不可达 | 提示具体的 HTTP 错误码 (401/429)；提供直达“API Key 设置”弹窗的一键修复入口 |
-| **3. TTS 语音合成 (Speech Engine)** | 检测 Edge-TTS 连通性；向本地 TTS 服务 (`http://localhost:8018/health`) 发送心跳；检测 `tts_queue` 队列消费状态 | 端口 8018 进程退出、Celery tts_worker 挂起、CosyVoice 鉴权失败 | 提示执行 `./start_all.sh` 恢复 TTS API 或检查 `tts_api.log` / `tts_worker.log` |
-| **4. 自动化调度器 (Automation Scheduler)** | 检查 APScheduler 调度守护进程状态、当前已注册定时 Job 清单、下一次执行时间戳及连续失败计数器 | 调度器处于暂停状态、连续失败超阈值被熔断 | 提示熔断原因；提供一键“重置状态并启动调度”快捷按钮 |
-| **5. 频道与音频存储 (Storage & Disk)** | 检查 SQLite 数据库读写延迟；检查 `data/audio/` 目录写权限、剩余磁盘空间、静态资源挂载路由可达性 | 磁盘写满、文件权限变为只读、静态挂载失效 | 提示当前磁盘剩余空间及路径权限；指导给予 `chmod 755 data/audio` 权限 |
-| **6. 设备网关与打断 (Device Gateway)** | 检查 `/api/v1/device/*` 路由可用性；检测打断应答 RAG 流水线在内存中的就绪状态；统计近 1 小时活跃设备心跳数 | 设备未连线、打断对话 Prompt 模板损坏 | 展示最近在线设备 SN 与心跳时间；提供模拟打断对话测试入口 |
-| **7. 数据库与持久层 (Database Engine)** | 执行 `SELECT count(*) FROM dolls, channels, news_items` 并测量执行耗时，检测表结构完整性 | SQLite 锁库 (database is locked)、损坏、表结构未迁移 | 提示锁库进程 PID；指导释放连接池 |
+| 模块名称                                   | 探针测试逻辑 (Active Probe Logic)                                                                                                | 常见故障场景 (Failure Scenarios)                               | 智能排查修复建议 (Actionable Remedy)                                                |
+| :----------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------- |
+| **1. 新闻抓取爬虫 (News Crawler)**         | 模拟向上游资讯源（Zaker/Sina）发起微型实时 HTTP 请求，检测状态码、解析耗时与提取条数；检测 Redis / Celery `crawler_queue` 连通性 | 上游接口 403/429 反爬、网络 DNS 解析超时、Celery Worker 未启动 | 提示上游接口拦截情况；建议调整爬虫间隔或检查 `crawler_worker.log`；提供一键重试抓取 |
+| **2. 大模型生成 (LLM Engine)**             | 向 DashScope / Gemini 发送 1-Token 测试改写 Prompt，校验 API Key 鉴权、配额余额与接口往返延迟 (RTT)                              | API Key 无效/欠费、Token 限流、网络代理不可达                  | 提示具体的 HTTP 错误码 (401/429)；提供直达“API Key 设置”弹窗的一键修复入口          |
+| **3. TTS 语音合成 (Speech Engine)**        | 检测 Edge-TTS 连通性；向本地 TTS 服务 (`http://localhost:8018/health`) 发送心跳；检测 `tts_queue` 队列消费状态                   | 端口 8018 进程退出、Celery tts_worker 挂起、CosyVoice 鉴权失败 | 提示执行 `./start_all.sh` 恢复 TTS API 或检查 `tts_api.log` / `tts_worker.log`      |
+| **4. 自动化调度器 (Automation Scheduler)** | 检查 APScheduler 调度守护进程状态、当前已注册定时 Job 清单、下一次执行时间戳及连续失败计数器                                     | 调度器处于暂停状态、连续失败超阈值被熔断                       | 提示熔断原因；提供一键“重置状态并启动调度”快捷按钮                                  |
+| **5. 频道与音频存储 (Storage & Disk)**     | 检查 SQLite 数据库读写延迟；检查 `data/audio/` 目录写权限、剩余磁盘空间、静态资源挂载路由可达性                                  | 磁盘写满、文件权限变为只读、静态挂载失效                       | 提示当前磁盘剩余空间及路径权限；指导给予 `chmod 755 data/audio` 权限                |
+| **6. 设备网关与打断 (Device Gateway)**     | 检查 `/api/v1/device/*` 路由可用性；检测打断应答 RAG 流水线在内存中的就绪状态；统计近 1 小时活跃设备心跳数                       | 设备未连线、打断对话 Prompt 模板损坏                           | 展示最近在线设备 SN 与心跳时间；提供模拟打断对话测试入口                            |
+| **7. 数据库与持久层 (Database Engine)**    | 执行 `SELECT count(*) FROM dolls, channels, news_items` 并测量执行耗时，检测表结构完整性                                         | SQLite 锁库 (database is locked)、损坏、表结构未迁移           | 提示锁库进程 PID；指导释放连接池                                                    |
 
 #### 3. 诊断交互流程时序图 (Diagnostic Flow Sequence)
 
@@ -454,34 +462,34 @@ erDiagram
 
 ## 5. 核心 API 接口清单 (API Specifications)
 
-| 分组 | 方法 | 路径 | 描述 |
-| :--- | :--- | :--- | :--- |
-| **玩偶管理** | `GET` | `/api/v1/radio-ai/dolls` | 获取全量玩偶及其关联频道 |
-| | `PUT` | `/api/v1/radio-ai/dolls/{doll_id}` | 保存/更新玩偶人设与元数据 |
-| | `DELETE`| `/api/v1/radio-ai/dolls/{doll_id}` | 删除指定玩偶配置 |
-| | `POST` | `/api/v1/radio-ai/dolls/{doll_id}/avatar` | 保存玩偶 Base64 裁剪头像 |
-| **频道管理** | `PUT` | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}` | 保存/更新频道编排 |
-| | `POST` | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}/freeze` | **一键解耦并固化音频资源** |
-| | `DELETE`| `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}` | 删除指定频道 |
-| | `GET` | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}/manifest` | 读取固化 `playlist_resource.json` |
-| **新闻与特刊** | `GET` | `/api/v1/admin/news` | 分页与多条件查询新闻列表 |
-| | `POST` | `/api/v1/radio-ai/news/pipeline` | 手动触发新闻素材抓取改写流水线 |
-| | `GET` | `/api/v1/admin/news/{id}` | 获取新闻详情及各玩偶专属点评 |
-| | `PATCH`| `/api/v1/admin/news/{id}/script` | 修改新闻口语化脚本文案 |
-| | `POST` | `/api/v1/admin/news/{id}/trash` | 移入回收站 |
-| | `POST` | `/api/v1/admin/news/{id}/restore`| 从回收站恢复 |
-| **音频资产** | `GET` | `/api/v1/radio-ai/audio-assets` | 获取全量系统与玩偶音频资产 |
-| | `POST` | `/api/v1/radio-ai/audio-assets/upload` | 上传物理音频文件并返回静态 URL |
-| | `DELETE`| `/api/v1/radio-ai/audio-assets` | 删除音频资产记录与本地文件 |
-| **硬件网关** | `GET` | `/api/v1/device/dolls/{doll_id}/channels` | 设备端开机获取频道与清单地址 |
-| | `POST` | `/api/v1/device/playback/status` | 硬件播放进度心跳上报 |
-| | `POST` | `/api/v1/device/playback/interruption-chat`| **播放中实时打断人设问答** |
-| **调度与运维** | `GET` | `/api/v1/radio-ai/automation` | 获取自动调度状态与健康度 |
-| | `PATCH`| `/api/v1/radio-ai/automation/config` | 修改自动化标签分配与抓取频次 |
-| | `GET` | `/api/v1/admin/logs` | 实时流式运行日志查询 |
-| | `GET` | `/api/v1/radio-ai/generative-config` | 读取大模型与音色全局配置 |
-| **监控与排障** | `GET` | `/api/v1/admin/health/status` | **获取全模块运行状态与健康评分** |
-| | `POST` | `/api/v1/admin/health/diagnose` | **触发全系统一键体检或单模块实时自检排障** |
+| 分组           | 方法     | 路径                                                              | 描述                                       |
+| :------------- | :------- | :---------------------------------------------------------------- | :----------------------------------------- |
+| **玩偶管理**   | `GET`    | `/api/v1/radio-ai/dolls`                                          | 获取全量玩偶及其关联频道                   |
+|                | `PUT`    | `/api/v1/radio-ai/dolls/{doll_id}`                                | 保存/更新玩偶人设与元数据                  |
+|                | `DELETE` | `/api/v1/radio-ai/dolls/{doll_id}`                                | 删除指定玩偶配置                           |
+|                | `POST`   | `/api/v1/radio-ai/dolls/{doll_id}/avatar`                         | 保存玩偶 Base64 裁剪头像                   |
+| **频道管理**   | `PUT`    | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}`          | 保存/更新频道编排                          |
+|                | `POST`   | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}/freeze`   | **一键解耦并固化音频资源**                 |
+|                | `DELETE` | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}`          | 删除指定频道                               |
+|                | `GET`    | `/api/v1/radio-ai/dolls/{doll_id}/channels/{channel_id}/manifest` | 读取固化 `playlist_resource.json`          |
+| **新闻与特刊** | `GET`    | `/api/v1/admin/news`                                              | 分页与多条件查询新闻列表                   |
+|                | `POST`   | `/api/v1/radio-ai/news/pipeline`                                  | 手动触发新闻素材抓取改写流水线             |
+|                | `GET`    | `/api/v1/admin/news/{id}`                                         | 获取新闻详情及各玩偶专属点评               |
+|                | `PATCH`  | `/api/v1/admin/news/{id}/script`                                  | 修改新闻口语化脚本文案                     |
+|                | `POST`   | `/api/v1/admin/news/{id}/trash`                                   | 移入回收站                                 |
+|                | `POST`   | `/api/v1/admin/news/{id}/restore`                                 | 从回收站恢复                               |
+| **音频资产**   | `GET`    | `/api/v1/radio-ai/audio-assets`                                   | 获取全量系统与玩偶音频资产                 |
+|                | `POST`   | `/api/v1/radio-ai/audio-assets/upload`                            | 上传物理音频文件并返回静态 URL             |
+|                | `DELETE` | `/api/v1/radio-ai/audio-assets`                                   | 删除音频资产记录与本地文件                 |
+| **硬件网关**   | `GET`    | `/api/v1/device/dolls/{doll_id}/channels`                         | 设备端开机获取频道与清单地址               |
+|                | `POST`   | `/api/v1/device/playback/status`                                  | 硬件播放进度心跳上报                       |
+|                | `POST`   | `/api/v1/device/playback/interruption-chat`                       | **播放中实时打断人设问答**                 |
+| **调度与运维** | `GET`    | `/api/v1/radio-ai/automation`                                     | 获取自动调度状态与健康度                   |
+|                | `PATCH`  | `/api/v1/radio-ai/automation/config`                              | 修改自动化标签分配与抓取频次               |
+|                | `GET`    | `/api/v1/admin/logs`                                              | 实时流式运行日志查询                       |
+|                | `GET`    | `/api/v1/radio-ai/generative-config`                              | 读取大模型与音色全局配置                   |
+| **监控与排障** | `GET`    | `/api/v1/admin/health/status`                                     | **获取全模块运行状态与健康评分**           |
+|                | `POST`   | `/api/v1/admin/health/diagnose`                                   | **触发全系统一键体检或单模块实时自检排障** |
 
 ---
 
@@ -495,7 +503,7 @@ flowchart TD
     classDef nfr4 fill:#78350F,stroke:#FBBF24,stroke-width:2px,color:#FFFBEB;
 
     NFR["🎯 非功能性质量标准 (NFRs)"]
-    
+
     N1["⚡ 响应性能\n- 固化清单拉取: < 100ms\n- 打断问答首包: < 1.5s\n- 页面路由切换: < 50ms"]:::nfr1
     N2["🛡️ 容灾与韧性\n- 本地 Manifest 缓存\n- 断网离线降级轮播\n- 失败自动重试机制"]:::nfr2
     N3["🔒 安全与合规\n- API Key 密文存储\n- 音频敏感词过滤\n- 本地网络隔离模式"]:::nfr3
@@ -539,4 +547,5 @@ gantt
 ```
 
 ---
-*文档版本：v2.0.0 | 维护团队：Robosen Radio AI 产研联合团队 | 更新日期：2026-08-16*
+
+_文档版本：v2.0.0 | 维护团队：Robosen Radio AI 产研联合团队 | 更新日期：2026-08-16_

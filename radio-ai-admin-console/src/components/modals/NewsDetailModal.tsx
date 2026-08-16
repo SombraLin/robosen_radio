@@ -93,8 +93,11 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
       onChanged();
       if (closeAfter) onClose();
       else await load();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : `${label}失败`);
+    } catch (reason: any) {
+      const msg = typeof reason === 'string'
+        ? reason
+        : (reason?.message || (typeof reason?.detail === 'string' ? reason.detail : `${label}失败`));
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setAction('');
     }
@@ -124,6 +127,7 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
             )}
           </div>
           <button
+            id="btn-close-news-modal"
             onClick={onClose}
             className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
           >
@@ -252,6 +256,7 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
                 </div>
 
                 <textarea
+                  id="textarea-news-script"
                   value={scriptText}
                   onChange={(event) => setScriptText(event.target.value)}
                   rows={6}
@@ -260,6 +265,7 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
 
                 <div className="flex flex-wrap items-center gap-3">
                   <button
+                    id="btn-save-news-script"
                     disabled={Boolean(action)}
                     onClick={() => runAction('保存播报稿', () => updateNewsScript(detail.id, scriptText))}
                     className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-text)] text-xs font-serif-editorial font-bold disabled:opacity-50 cursor-pointer rounded-sm shadow hover:opacity-90 transition-all flex items-center gap-1"
@@ -269,6 +275,7 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
                   </button>
 
                   <button
+                    id="btn-regenerate-news-script"
                     disabled={Boolean(action)}
                     onClick={() =>
                       runAction('LLM 重新生成播报稿', () =>
@@ -282,6 +289,7 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
                   </button>
 
                   <button
+                    id="btn-generate-news-audio"
                     disabled={Boolean(action)}
                     onClick={() =>
                       runAction('TTS 重生成新闻音频', () =>
