@@ -273,6 +273,115 @@ flowchart TD
 
 ---
 
+### 3.6 模块六：仪表盘全系统监控与一键诊断排障中心 (Dashboard Full Observability & Failure Diagnostics)
+
+```mermaid
+flowchart TD
+    %% Multi-color Styling Definitions for Diagnostics
+    classDef dashView fill:#0F172A,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC;
+    classDef diagCore fill:#312E81,stroke:#A78BFA,stroke-width:2px,color:#EDE9FE;
+    classDef probeOk fill:#064E3B,stroke:#34D399,stroke-width:2px,color:#ECFDF5;
+    classDef probeWarn fill:#78350F,stroke:#FBBF24,stroke-width:2px,color:#FFFBEB;
+    classDef probeFail fill:#881337,stroke:#FB7185,stroke-width:2px,color:#FFF1F2;
+    classDef remedyBox fill:#1E293B,stroke:#38BDF8,stroke-width:1px,color:#F1F5F9;
+
+    subgraph Dashboard_UI ["🖥️ 仪表盘前端监控看板 (Dashboard View - /dashboard)"]
+        HealthOverview["📈 全局健康评分与状态胶囊 (Overall Health Score)"]
+        ModuleCards["📦 7大核心模块状态卡片 (Status Cards & Latency ms)"]
+        OneClickDiag["⚡ 一键全模块体检 (Run Full Diagnostic)"]
+        SingleTest["🔍 单模块即时测试 (Test Probe)"]
+        DiagModal["📋 诊断排障抽屉与专家修复建议 (Remedy Drawer)"]
+    end
+    class HealthOverview,ModuleCards,OneClickDiag,SingleTest,DiagModal dashView;
+
+    subgraph Diagnostic_Engine ["⚙️ 后端诊断分析与探针引擎 (/api/v1/admin/health/*)"]
+        DiagRouter["🚪 诊断网关与调度器 (Health Diagnostic Router)"]
+        ProbeCrawler["🕷️ 爬虫源连通性与反爬探针\n(Zaker / Sina Live Probe)"]
+        ProbeLLM["🧠 大模型 Key 有效性与延迟探针\n(DashScope / Gemini Probe)"]
+        ProbeTTS["🎙️ TTS 服务与 Celery 队列探针\n(Edge-TTS / CosyVoice Port:8018)"]
+        ProbeScheduler["⏱️ 调度引擎作业与连续失败探针\n(APScheduler Health Probe)"]
+        ProbeStorage["💾 数据库与音频磁盘权限探针\n(SQLite & Disk I/O Probe)"]
+        ProbeGateway["📡 设备网关与打断 RAG 探针\n(Playback & Interruption Probe)"]
+    end
+    class DiagRouter,ProbeCrawler,ProbeLLM,ProbeTTS,ProbeScheduler,ProbeStorage,ProbeGateway diagCore;
+
+    subgraph Failure_Remedies ["🛠️ 专家诊断排障建议库 (Smart Failure Remediation)"]
+        R1["💡 爬虫异常建议: 检查上游API防爬策略、更新User-Agent或切换备用抓取源"]
+        R2["💡 LLM 异常建议: 检查 DASHSCOPE_API_KEY 是否欠费/过期，跳转 API 设置"]
+        R3["💡 TTS 异常建议: 检查端口 8018 服务是否存活 (start_all.sh)，重启 Celery Worker"]
+        R4["💡 调度异常建议: 检查任务调度开关是否开启、重置连续失败计数器"]
+    end
+    class R1,R2,R3,R4 remedyBox;
+
+    OneClickDiag -->|POST /health/diagnose| DiagRouter
+    SingleTest -->|POST /health/diagnose?module=xxx| DiagRouter
+    DiagRouter --> ProbeCrawler
+    DiagRouter --> ProbeLLM
+    DiagRouter --> ProbeTTS
+    DiagRouter --> ProbeScheduler
+    DiagRouter --> ProbeStorage
+    DiagRouter --> ProbeGateway
+
+    ProbeCrawler -.-> R1
+    ProbeLLM -.-> R2
+    ProbeTTS -.-> R3
+    ProbeScheduler -.-> R4
+
+    DiagRouter -->|返回结构化诊断报告| DiagModal
+```
+
+#### 1. 监控与诊断业务背景与痛点
+在复合式 AI 广播系统中，任一模块（如爬虫被反爬拦截、大模型 API Key 过期、TTS 微服务未启动、磁盘无写入权限、Celery 队列断连）出现异常都会导致业务链路中断。
+传统运维方式需要登录服务器查看 `logs/crawler_worker.log` 或 `logs/tts_worker.log`，门槛高且定位慢。
+**本需求要求在前端仪表盘（`/dashboard`）实现开箱即用的全模块运行监控与一键诊断自检**：
+- **实时呈现**：展示各模块的运行状态（`HEALTHY` / `DEGRADED` / `DOWN` / `TESTING`）、响应延迟（ms）、最后一次检查时间及连续失败次数。
+- **一键自检**：提供“全系统一键体检”及“单模块即时测试”按钮，主动发起端到端真实探针测试。
+- **根因分析与排障指引**：当新闻抓取或语音生成失败时，自动提取错误堆栈，生成通俗易懂的根因分析与可点击的一键修复跳转（如快捷打开 API Key 设置弹窗、一键重启自动化调度等）。
+
+#### 2. 七大核心模块诊断探针矩阵 (Diagnostic Probes Matrix)
+
+| 模块名称 | 探针测试逻辑 (Active Probe Logic) | 常见故障场景 (Failure Scenarios) | 智能排查修复建议 (Actionable Remedy) |
+| :--- | :--- | :--- | :--- |
+| **1. 新闻抓取爬虫 (News Crawler)** | 模拟向上游资讯源（Zaker/Sina）发起微型实时 HTTP 请求，检测状态码、解析耗时与提取条数；检测 Redis / Celery `crawler_queue` 连通性 | 上游接口 403/429 反爬、网络 DNS 解析超时、Celery Worker 未启动 | 提示上游接口拦截情况；建议调整爬虫间隔或检查 `crawler_worker.log`；提供一键重试抓取 |
+| **2. 大模型生成 (LLM Engine)** | 向 DashScope / Gemini 发送 1-Token 测试改写 Prompt，校验 API Key 鉴权、配额余额与接口往返延迟 (RTT) | API Key 无效/欠费、Token 限流、网络代理不可达 | 提示具体的 HTTP 错误码 (401/429)；提供直达“API Key 设置”弹窗的一键修复入口 |
+| **3. TTS 语音合成 (Speech Engine)** | 检测 Edge-TTS 连通性；向本地 TTS 服务 (`http://localhost:8018/health`) 发送心跳；检测 `tts_queue` 队列消费状态 | 端口 8018 进程退出、Celery tts_worker 挂起、CosyVoice 鉴权失败 | 提示执行 `./start_all.sh` 恢复 TTS API 或检查 `tts_api.log` / `tts_worker.log` |
+| **4. 自动化调度器 (Automation Scheduler)** | 检查 APScheduler 调度守护进程状态、当前已注册定时 Job 清单、下一次执行时间戳及连续失败计数器 | 调度器处于暂停状态、连续失败超阈值被熔断 | 提示熔断原因；提供一键“重置状态并启动调度”快捷按钮 |
+| **5. 频道与音频存储 (Storage & Disk)** | 检查 SQLite 数据库读写延迟；检查 `data/audio/` 目录写权限、剩余磁盘空间、静态资源挂载路由可达性 | 磁盘写满、文件权限变为只读、静态挂载失效 | 提示当前磁盘剩余空间及路径权限；指导给予 `chmod 755 data/audio` 权限 |
+| **6. 设备网关与打断 (Device Gateway)** | 检查 `/api/v1/device/*` 路由可用性；检测打断应答 RAG 流水线在内存中的就绪状态；统计近 1 小时活跃设备心跳数 | 设备未连线、打断对话 Prompt 模板损坏 | 展示最近在线设备 SN 与心跳时间；提供模拟打断对话测试入口 |
+| **7. 数据库与持久层 (Database Engine)** | 执行 `SELECT count(*) FROM dolls, channels, news_items` 并测量执行耗时，检测表结构完整性 | SQLite 锁库 (database is locked)、损坏、表结构未迁移 | 提示锁库进程 PID；指导释放连接池 |
+
+#### 3. 诊断交互流程时序图 (Diagnostic Flow Sequence)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as 👩‍💻 导播管理员
+    participant UI as 📊 仪表盘 Dashboard
+    participant Backend as ⚙️ 后端诊断路由 /health/*
+    participant Probes as 🔍 多模块探针执行器
+    participant Upstream as 🌐 外部服务 (Zaker / DashScope / TTS / DB)
+
+    Admin->>UI: 进入 /dashboard 页面
+    UI->>Backend: GET /api/v1/admin/health/status
+    Backend-->>UI: 返回当前各模块缓存健康状态
+    UI->>UI: 渲染模块健康卡片、延迟指标与最近告警
+
+    opt 管理员点击 "一键全系统体检" 或 "单模块诊断"
+        Admin->>UI: 点击 "立即测试新闻抓取模块"
+        UI->>UI: 切换卡片为 "诊断测试中..." 动画状态
+        UI->>Backend: POST /api/v1/admin/health/diagnose (payload: {module: "crawler"})
+        Backend->>Probes: 触发 live probe 探针
+        Probes->>Upstream: 向爬虫目标站点与 Celery Worker 发送真实探测请求
+        Upstream-->>Probes: 返回探测状态码与响应体 (或抛出 Timeout/403 异常)
+        Probes->>Probes: 匹配专家知识库，生成诊断结论与修复建议
+        Probes-->>Backend: 封装 DiagnosticResult (status, latency, error, suggestion)
+        Backend-->>UI: 返回诊断明细 JSON
+        UI->>UI: 弹出诊断结果面板，标红故障原因，展示一键修复指引
+    end
+```
+
+---
+
 ## 4. 核心数据模型契约 (Domain Data Models)
 
 ```mermaid
@@ -371,6 +480,8 @@ erDiagram
 | | `PATCH`| `/api/v1/radio-ai/automation/config` | 修改自动化标签分配与抓取频次 |
 | | `GET` | `/api/v1/admin/logs` | 实时流式运行日志查询 |
 | | `GET` | `/api/v1/radio-ai/generative-config` | 读取大模型与音色全局配置 |
+| **监控与排障** | `GET` | `/api/v1/admin/health/status` | **获取全模块运行状态与健康评分** |
+| | `POST` | `/api/v1/admin/health/diagnose` | **触发全系统一键体检或单模块实时自检排障** |
 
 ---
 
